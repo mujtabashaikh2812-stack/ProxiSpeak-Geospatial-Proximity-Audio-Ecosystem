@@ -14,7 +14,8 @@ export default function LevelMetter({ level = 0, muted = false }) {
     >
       {Array.from({ length: SEGMENTS }, (_, i) => {
         const on = i < lit;
-        const color = i >= SEGMENTS - 2 ? 'bg-red-400' : i >= SEGMENTS - 5 ? 'bg-amber-300' : 'bg-emerald-400';
+        const color =
+          i >= SEGMENTS - 2 ? 'bg-red-400' : i >= SEGMENTS - 5 ? 'bg-amber-300' : 'bg-emerald-400';
         return (
           <span
             key={i}

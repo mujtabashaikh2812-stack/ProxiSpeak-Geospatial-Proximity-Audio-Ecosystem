@@ -1,7 +1,7 @@
 import { useMicrophone } from '../../UseMicrophone';
-import { useMicLevel } from './LevelMetter';
+import { useMicLevel } from '../../UseMiceLevel';
 import MicToogle from './MicToogle';
-import LevelMetter from './LevelMetter';
+import LevelMetter from './LevelMetter'
 import MicError from './MicError';
 
 // Pass className to place it, e.g. "fixed bottom-4 left-1/2 -translate-x-1/2"
