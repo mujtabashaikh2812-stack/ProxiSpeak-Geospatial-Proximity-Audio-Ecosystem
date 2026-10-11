@@ -1,5 +1,5 @@
-import { useMicrophone } from '../../audio/useMicrophone';
-import { useMicLevel } from '../../audio/levelMeter';
+import { useMicrophone } from '../../UseMicrophone';
+import { useMicLevel } from './LevelMetter';
 import MicToogle from './MicToogle';
 import LevelMetter from './LevelMetter';
 import MicError from './MicError';
