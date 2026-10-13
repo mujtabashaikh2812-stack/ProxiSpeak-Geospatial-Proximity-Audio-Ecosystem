@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getAudioContext, resumeAudioContext } from '../AudioContext';
-import { useSpatialAudio } from '../UseSpatialAudio';
-import { distanceBetween, volumeForDistance, EARSHOT_RADIUS } from '../mixer/distanceVolume';
-import { hasLineOfSight } from '../mixer/occlusion';
+import { useSpatialAudio } from './useSpatialAudio';
+import { distanceBetween, volumeForDistance, EARSHOT_RADIUS } from '../Mixer/Distancevolume';
+import { hasLineOfSight } from '../Mixer/Occulution';
 
 const W = 400;
 const H = 300;

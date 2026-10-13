@@ -1,5 +1,5 @@
-import { createSpatialPanner, setPannerPosition } from './spatialPanner';
-import { OPEN_FREQ, OCCLUDED_FREQ, OCCLUDED_GAIN } from './occlusion';
+import { createSpatialPanner, setPannerPosition } from '../Mixer/Spitialpanner';
+import { OPEN_FREQ, OCCLUDED_FREQ, OCCLUDED_GAIN } from '../Mixer/Occulution';
 
 const SMOOTH = 0.05; // seconds, avoids clicks when values change
 

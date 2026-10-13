@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { createMixer } from './mixer/createMixer';
+import { createMixer } from '../Mixer/createMixer';
 
 // remoteStreams  = { peerId: MediaStream }      (from useVoiceRoom)
 // myPosition     = { x, y }                      (from the canvas)

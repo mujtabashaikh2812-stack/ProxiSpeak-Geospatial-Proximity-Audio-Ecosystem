@@ -1,7 +1,7 @@
 import { getAudioContext } from '../AudioContext';
-import { createPeerAudio } from './gainManager';
+import { createPeerAudio } from './Gainmanger';
 import { distanceBetween, volumeForDistance } from './distanceVolume';
-import { hasLineOfSight } from './occlusion';
+import { hasLineOfSight } from '../Mixer/Occulution';
 
 const SPEAKING_THRESHOLD = 0.02; // raw volume (0..1) above which someone counts as speaking
 
