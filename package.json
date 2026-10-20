@@ -1,0 +1,25 @@
+{
+  "name": "proxispeak-geospatial-proximity-audio-ecosystem",
+  "version": "1.0.0",
+  "description": "[![Status: In Development](https://img.shields.io/badge/Status-In%20Development-blue.svg)]()\r [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)\r [![Node.js](https://img.shields.io/badge/Node.js-v18%2B-brightgreen.svg)]()\r [![React](https://img.shields.io/badge/React-18-61dafb.svg)]()",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mujtabashaikh2812-stack/ProxiSpeak-Geospatial-Proximity-Audio-Ecosystem.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/mujtabashaikh2812-stack/ProxiSpeak-Geospatial-Proximity-Audio-Ecosystem/issues"
+  },
+  "homepage": "https://github.com/mujtabashaikh2812-stack/ProxiSpeak-Geospatial-Proximity-Audio-Ecosystem#readme",
+  "dependencies": {
+    "express": "^5.3.0",
+    "mongoose": "^9.11.2"
+  }
+}
