@@ -4,7 +4,7 @@
   "description": "ProxiSpeak backend: geospatial proximity audio ecosystem with Mongoose, MongoDB 2dsphere spatial indexing, and canvas-coordinate proximity queries.",
   "main": "index.js",
   "scripts": {
-    "test": "node --test tests/",
+    "test": "node --test",
     "test:unit": "node --test tests/unit.test.js",
     "seed": "node seed.js",
     "demo": "node queryDemo.js",

@@ -33,7 +33,15 @@ function isFiniteNumber(value) {
 
 // Converts canvas (x, y) pixel coordinates to a GeoJSON [longitude, latitude] pair.
 // canvasX increases to the right (east). canvasY increases downward (south).
-function canvasToGeoJSON(canvasX, canvasY) {
+// scaleMetresPerPixel defaults to METRES_PER_PIXEL when omitted.
+function canvasToGeoJSON(canvasX, canvasY, scaleMetresPerPixel) {
+  if (scaleMetresPerPixel === undefined) {
+    scaleMetresPerPixel = METRES_PER_PIXEL;
+  }
+  if (!isFiniteNumber(scaleMetresPerPixel) || scaleMetresPerPixel <= 0) {
+    throw new Error('scaleMetresPerPixel must be a finite positive number');
+  }
+
   if (!isFiniteNumber(canvasX)) {
     throw new Error('canvasX must be a finite number');
   }
@@ -47,8 +55,8 @@ function canvasToGeoJSON(canvasX, canvasY) {
     );
   }
 
-  const metresEast = canvasX * METRES_PER_PIXEL;
-  const metresSouth = canvasY * METRES_PER_PIXEL;
+  const metresEast = canvasX * scaleMetresPerPixel;
+  const metresSouth = canvasY * scaleMetresPerPixel;
 
   const deltaLongitude = metresEast / METRES_PER_DEGREE_LONGITUDE_AT_ORIGIN;
   const deltaLatitude = metresSouth / METRES_PER_DEGREE_LATITUDE;
@@ -64,12 +72,18 @@ function canvasToGeoJSON(canvasX, canvasY) {
 }
 
 // Converts a radius in canvas pixels to a radius in metres for MongoDB $near queries.
-// radiusMetres = radiusPixels * METRES_PER_PIXEL
-function pixelsToMetres(radiusPixels) {
+// radiusMetres = radiusPixels * scaleMetresPerPixel (defaults to METRES_PER_PIXEL)
+function pixelsToMetres(radiusPixels, scaleMetresPerPixel) {
+  if (scaleMetresPerPixel === undefined) {
+    scaleMetresPerPixel = METRES_PER_PIXEL;
+  }
+  if (!isFiniteNumber(scaleMetresPerPixel) || scaleMetresPerPixel <= 0) {
+    throw new Error('scaleMetresPerPixel must be a finite positive number');
+  }
   if (!isFiniteNumber(radiusPixels) || radiusPixels < 0) {
     throw new Error('radiusPixels must be a finite nonnegative number');
   }
-  return radiusPixels * METRES_PER_PIXEL;
+  return radiusPixels * scaleMetresPerPixel;
 }
 
 module.exports = {

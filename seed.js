@@ -3,7 +3,7 @@
 const mongoose = require('mongoose');
 const User = require('./User');
 const { connectDB, getUri } = require('./db');
-const { canvasToGeoJSON, pixelsToMetres } = require('./canvasToGeo');
+const { canvasToGeoJSON } = require('./canvasToGeo');
 
 const SEED_NAMESPACE_PREFIX = 'seed:proxispeak:v1:';
 const QUERY_CENTRE_X = 500;
@@ -11,12 +11,10 @@ const QUERY_CENTRE_Y = 500;
 const RADIUS_PIXELS = 100;
 
 const SEED_USERS = [
-  // Inside 100 canvas pixels of query centre (500, 500)
   { canvasX: 500, canvasY: 500, displayName: 'Seed User 1' },
   { canvasX: 550, canvasY: 500, displayName: 'Seed User 2' },
   { canvasX: 500, canvasY: 550, displayName: 'Seed User 3' },
   { canvasX: 530, canvasY: 530, displayName: 'Seed User 4' },
-  // Outside 100 canvas pixels of query centre
   { canvasX: 700, canvasY: 500, displayName: 'Seed User 5' },
   { canvasX: 500, canvasY: 700, displayName: 'Seed User 6' },
   { canvasX: 900, canvasY: 900, displayName: 'Seed User 7' },
@@ -42,15 +40,14 @@ function refuseProductionUri(uri) {
   }
 }
 
-async function ensure2dsphereIndex(session) {
+async function ensure2dsphereIndex() {
   const indexes = await User.collection.indexes();
   const has2dsphere = indexes.some(
-    (idx) =>
-      idx.key && idx.key.location === '2dsphere'
+    (idx) => idx.key && idx.key.location === '2dsphere'
   );
   if (!has2dsphere) {
     console.log('2dsphere index not found. Creating location 2dsphere index...');
-    await User.collection.createIndex({ location: '2dsphere' }, { session });
+    await User.collection.createIndex({ location: '2dsphere' });
     console.log('2dsphere index created.');
   } else {
     console.log('2dsphere index on location already exists.');
@@ -63,58 +60,53 @@ async function runSeed() {
   const uri = getUri();
   refuseProductionUri(uri);
 
-  console.log('Seeding database (database name: procsispeak)');
-  console.log('Seed namespace prefix:', SEED_NAMESPACE_PREFIX);
-
   await connectDB();
 
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  console.log('Connected to host:', mongoose.connection.host);
+  console.log('Database name:', mongoose.connection.name);
+  console.log('Seed namespace prefix:', SEED_NAMESPACE_PREFIX);
 
   try {
-    const indexes = await ensure2dsphereIndex(session);
+    await ensure2dsphereIndex();
 
-    let insertedOrUpdated = 0;
-    for (const userData of SEED_USERS) {
+    const operations = SEED_USERS.map((userData) => {
       const [longitude, latitude] = canvasToGeoJSON(userData.canvasX, userData.canvasY);
       const userId = `${SEED_NAMESPACE_PREFIX}${userData.displayName.toLowerCase().replace(/\s+/g, '-')}`;
 
-      const result = await User.findOneAndUpdate(
-        { userId },
-        {
-          userId,
-          location: { type: 'Point', coordinates: [longitude, latitude] },
-          canvasX: userData.canvasX,
-          canvasY: userData.canvasY,
-          displayName: userData.displayName,
+      return {
+        updateOne: {
+          filter: { userId },
+          update: {
+            $set: {
+              userId,
+              location: { type: 'Point', coordinates: [longitude, latitude] },
+              canvasX: userData.canvasX,
+              canvasY: userData.canvasY,
+              displayName: userData.displayName,
+            },
+          },
+          upsert: true,
         },
-        { upsert: true, new: true, setDefaultsOnInsert: true, session }
-      );
-      insertedOrUpdated += 1;
-    }
+      };
+    });
 
-    await session.commitTransaction();
+    const result = await User.bulkWrite(operations);
 
-    // Count users in this seed namespace
     const seedCount = await User.countDocuments({ userId: { $regex: `^${SEED_NAMESPACE_PREFIX}` } });
 
-    // Re-fetch indexes after seed
     const finalIndexes = await User.collection.indexes();
     const has2dsphereFinal = finalIndexes.some(
       (idx) => idx.key && idx.key.location === '2dsphere'
     );
 
-    console.log('Seed users inserted or updated:', insertedOrUpdated);
+    console.log('Seed users inserted or updated:', operations.length);
+    console.log('bulkWrite result - upserted:', result.upsertedCount, 'modified:', result.modifiedCount);
     console.log('Users in seed namespace:', seedCount);
     console.log('2dsphere index verified:', has2dsphereFinal);
     console.log('Indexes:', JSON.stringify(finalIndexes.map((i) => ({ name: i.name, key: i.key })), null, 2));
 
-    return { insertedOrUpdated, seedCount, has2dsphereIndex: has2dsphereFinal };
-  } catch (error) {
-    await session.abortTransaction();
-    throw error;
+    return { insertedOrUpdated: operations.length, seedCount, has2dsphereIndex: has2dsphereFinal };
   } finally {
-    await session.endSession();
     await mongoose.connection.close();
     console.log('Database connection closed.');
   }

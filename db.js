@@ -1,3 +1,6 @@
+const loadEnv = require('./loadEnv');
+loadEnv();
+
 const mongoose = require('mongoose');
 
 const LOCAL_FALLBACK_URI = 'mongodb://127.0.0.1:27017/procsispeak';

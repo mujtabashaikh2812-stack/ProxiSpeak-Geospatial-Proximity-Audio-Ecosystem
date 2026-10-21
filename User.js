@@ -16,6 +16,12 @@ const UserSchema = new mongoose.Schema(
         message: 'userId must be a nonblank string',
       },
     },
+    displayName: {
+      type: String,
+      trim: true,
+      required: false,
+      maxlength: 80,
+    },
     location: {
       type: {
         type: String,

@@ -1,8 +1,13 @@
 'use strict';
 
-const mongoose = require('mongoose');
 const User = require('./User');
 const { canvasToGeoJSON, pixelsToMetres, isFiniteNumber } = require('./canvasToGeo');
+
+// Candidate retrieval allowance in metres. This margin only widens the set of
+// candidates returned by the $near query so that no real neighbour is dropped
+// (e.g. due to coordinate rounding). The exact Math.hypot check on canvas
+// pixels remains the final answer. Do not widen the final result with this margin.
+const CANDIDATE_MARGIN_METRES = 1;
 
 // Proximity service for Week 2: find users within a canvas pixel radius of a query centre.
 // The API centre is a query point (canvas coordinates), not necessarily an actual user.
@@ -37,18 +42,17 @@ async function findUsersNearCanvasPoint(centreX, centreY, radiusPixels, options 
   const limit = options.limit || 50;
 
   const [centreLongitude, centreLatitude] = canvasToGeoJSON(centreX, centreY);
-  const radiusMetres = pixelsToMetres(radiusPixels);
+  const maxDistance = pixelsToMetres(radiusPixels) + CANDIDATE_MARGIN_METRES;
 
   // Candidate retrieval via indexed $near query.
   // $maxDistance is in metres for a 2dsphere index.
-  // Because METRES_PER_PIXEL = 1 (provisional), radiusMetres === radiusPixels.
-  // Spherical distance and flat canvas distance differ slightly; the exact
+  // CANDIDATE_MARGIN_METRES widens candidate retrieval only; the exact
   // canvas-distance filter below is the final arbiter.
   const candidates = await User.find({
     location: {
       $near: {
         $geometry: { type: 'Point', coordinates: [centreLongitude, centreLatitude] },
-        $maxDistance: radiusMetres,
+        $maxDistance: maxDistance,
       },
     },
   })
@@ -80,4 +84,5 @@ module.exports = {
   findUsersNearCanvasPoint,
   validateCentre,
   validateRadius,
+  CANDIDATE_MARGIN_METRES,
 };

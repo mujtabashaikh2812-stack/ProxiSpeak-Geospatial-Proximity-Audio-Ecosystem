@@ -233,6 +233,14 @@ test('pixelsToMetres: uses radiusPixels * METRES_PER_PIXEL formula', () => {
   assert.strictEqual(pixelsToMetres(50), 50 * METRES_PER_PIXEL);
 });
 
+test('pixelsToMetres: with scale 2 doubles the result', () => {
+  assert.strictEqual(pixelsToMetres(100, 2), 200);
+});
+
+test('pixelsToMetres: with scale 0.5 halves the result', () => {
+  assert.strictEqual(pixelsToMetres(100, 0.5), 50);
+});
+
 test('pixelsToMetres: rejects negative radius', () => {
   assert.throws(() => pixelsToMetres(-1), /nonnegative/);
 });
@@ -247,13 +255,27 @@ test('canvasToGeo: METRES_PER_PIXEL default is 1 (provisional)', () => {
 });
 
 test('canvasToGeo: non-1 scale produces different mapping', () => {
-  // If METRES_PER_PIXEL were different, canvasToGeoJSON results would change.
-  // Since METRES_PER_PIXEL is 1, 100 pixels = 100 metres = ~0.000898 degrees.
-  const [lng, lat] = canvasToGeoJSON(100, 100);
-  const expectedLng = ORIGIN_LONGITUDE + 100 / 111320;
-  const expectedLat = ORIGIN_LATITUDE - 100 / 111320;
-  assert.ok(Math.abs(lng - expectedLng) < 0.000001);
-  assert.ok(Math.abs(lat - expectedLat) < 0.000001);
+  // With scale 2, 100 pixels should map to twice the longitude/latitude delta
+  const [lng2, lat2] = canvasToGeoJSON(100, 100, 2);
+  const [lng1, lat1] = canvasToGeoJSON(100, 100, 1);
+  assert.ok(Math.abs(lng2 - ORIGIN_LONGITUDE) > Math.abs(lng1 - ORIGIN_LONGITUDE),
+    'Expected longitude delta to double with scale 2');
+  assert.ok(Math.abs(lat2 - ORIGIN_LATITUDE) > Math.abs(lat1 - ORIGIN_LATITUDE),
+    'Expected latitude delta to double with scale 2');
+  // Verify exact doubling
+  const expectedLng2 = ORIGIN_LONGITUDE + (100 * 2) / 111320;
+  const expectedLat2 = ORIGIN_LATITUDE - (100 * 2) / 111320;
+  assert.ok(Math.abs(lng2 - expectedLng2) < 0.000001);
+  assert.ok(Math.abs(lat2 - expectedLat2) < 0.000001);
+});
+
+test('canvasToGeo: half scale produces halved mapping', () => {
+  const [lng05, lat05] = canvasToGeoJSON(100, 100, 0.5);
+  const [lng1, lat1] = canvasToGeoJSON(100, 100, 1);
+  assert.ok(Math.abs(lng05 - ORIGIN_LONGITUDE) < Math.abs(lng1 - ORIGIN_LONGITUDE),
+    'Expected longitude delta to halve with scale 0.5');
+  assert.ok(Math.abs(lat05 - ORIGIN_LATITUDE) < Math.abs(lat1 - ORIGIN_LATITUDE),
+    'Expected latitude delta to halve with scale 0.5');
 });
 
 test('canvasToGeo: deterministic output for same input', () => {
@@ -266,19 +288,4 @@ test('User: repeatable seed userId values do not create duplicates (namespace ch
   const userId1 = 'seed:proxispeak:v1:seed-user-1';
   const userId2 = 'seed:proxispeak:v1:seed-user-1';
   assert.strictEqual(userId1, userId2, 'Same seed namespace prefix yields same userId');
-});
-
-// Integration test stubs (require MongoDB - blocked when unavailable)
-test('integration: geospatial index existence (blocked without MongoDB)', () => {
-  // This test requires a live MongoDB connection. It is reported as blocked
-  // when MongoDB is not available. See integration.test.js for the full version.
-  assert.ok(true, 'Placeholder: integration test requires MongoDB');
-});
-
-test('integration: repeatable seeding without duplicates (blocked without MongoDB)', () => {
-  assert.ok(true, 'Placeholder: integration test requires MongoDB');
-});
-
-test('integration: requesting-user exclusion (blocked without MongoDB)', () => {
-  assert.ok(true, 'Placeholder: integration test requires MongoDB');
 });

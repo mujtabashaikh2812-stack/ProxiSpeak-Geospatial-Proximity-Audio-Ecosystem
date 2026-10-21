@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const { connectDB } = require('./db');
 const { findUsersNearCanvasPoint } = require('./proximityService');
 const User = require('./User');
+const { canvasToGeoJSON } = require('./canvasToGeo');
 
 const QUERY_CENTRE_X = 500;
 const QUERY_CENTRE_Y = 500;
@@ -26,9 +27,17 @@ function stats(values) {
   return { min, max, avg, median, p95 };
 }
 
-// Converts nanoseconds (bigint) to milliseconds.
 function nsToMs(ns) {
   return Number(ns) / 1_000_000;
+}
+
+function printStats(label, s) {
+  console.log(label);
+  console.log('  min:', s.min.toFixed(3));
+  console.log('  median:', s.median.toFixed(3));
+  console.log('  average:', s.avg.toFixed(3));
+  console.log('  p95:', s.p95.toFixed(3));
+  console.log('  max:', s.max.toFixed(3));
 }
 
 async function runBenchmark() {
@@ -47,45 +56,68 @@ async function runBenchmark() {
   await connectDB();
 
   try {
-    // Count dataset size
     const datasetSize = await User.countDocuments({});
     console.log('Dataset size:', datasetSize, 'users');
 
+    const [centreLongitude, centreLatitude] = canvasToGeoJSON(QUERY_CENTRE_X, QUERY_CENTRE_Y);
+    const maxDistance = RADIUS_PIXELS + 1; // pixelsToMetres(100) + CANDIDATE_MARGIN_METRES
+
     // Warm-up
     for (let i = 0; i < WARM_UP; i++) {
+      await User.find({
+        location: {
+          $near: {
+            $geometry: { type: 'Point', coordinates: [centreLongitude, centreLatitude] },
+            $maxDistance: maxDistance,
+          },
+        },
+      }).select('userId canvasX canvasY displayName').lean();
       await findUsersNearCanvasPoint(QUERY_CENTRE_X, QUERY_CENTRE_Y, RADIUS_PIXELS);
     }
 
-    const fullServiceTimes = [];
+    const dbQueryTimes = [];
+    const serviceTimes = [];
     let matchCount = 0;
 
     for (let i = 0; i < ITERATIONS; i++) {
-      const start = process.hrtime.bigint();
+      // Time the raw $near database query only.
+      const dbStart = process.hrtime.bigint();
+      await User.find({
+        location: {
+          $near: {
+            $geometry: { type: 'Point', coordinates: [centreLongitude, centreLatitude] },
+            $maxDistance: maxDistance,
+          },
+        },
+      }).select('userId canvasX canvasY displayName').lean();
+      const dbEnd = process.hrtime.bigint();
+      dbQueryTimes.push(nsToMs(dbEnd - dbStart));
+
+      // Time the full proximity service.
+      const svcStart = process.hrtime.bigint();
       const matches = await findUsersNearCanvasPoint(QUERY_CENTRE_X, QUERY_CENTRE_Y, RADIUS_PIXELS);
-      const end = process.hrtime.bigint();
-      fullServiceTimes.push(nsToMs(end - start));
+      const svcEnd = process.hrtime.bigint();
+      serviceTimes.push(nsToMs(svcEnd - svcStart));
       matchCount = matches.length;
     }
 
-    const serviceStats = stats(fullServiceTimes);
+    const dbStats = stats(dbQueryTimes);
+    const svcStats = stats(serviceTimes);
 
     console.log('');
     console.log('Match count:', matchCount);
-    console.log('Full proximity-service timing (ms):');
-    console.log('  min:', serviceStats.min.toFixed(3));
-    console.log('  median:', serviceStats.median.toFixed(3));
-    console.log('  average:', serviceStats.avg.toFixed(3));
-    console.log('  p95:', serviceStats.p95.toFixed(3));
-    console.log('  max:', serviceStats.max.toFixed(3));
     console.log('');
-    console.log('What is timed: full findUsersNearCanvasPoint call, including');
-    console.log('MongoDB $near candidate retrieval and canvas-distance filtering.');
+    printStats('Database query ($near) timing (ms):', dbStats);
     console.log('');
-    console.log('Note: Database-query-only timing is not separated because the');
-    console.log('proximity service performs both operations in a single call.');
+    printStats('Full proximity service timing (ms):', svcStats);
     console.log('');
-    console.log('Do not guarantee under-20ms performance from these results.');
+    console.log('What is timed:');
+    console.log('  - Database query: raw $near query with lean() and field select only.');
+    console.log('  - Full service: findUsersNearCanvasPoint including $near candidate');
+    console.log('    retrieval and exact canvas-distance filtering.');
+    console.log('');
     console.log('These are development measurements on a small dataset.');
+    console.log('They are not a guarantee of production performance.');
   } finally {
     await mongoose.connection.close();
     console.log('Database connection closed.');
