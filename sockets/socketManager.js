@@ -2,6 +2,7 @@
 
 const { Server } = require('socket.io');
 const config = require('../config/serverConfig');
+const { registerSignalingHandlers } = require('./signalingHandler');
 
 /**
  * In-memory active user registry:
@@ -34,6 +35,9 @@ function initSocketServer(httpServer) {
 
   io.on('connection', (socket) => {
     console.log(`[Socket] Peer connected: ${socket.id}`);
+
+    // Register WebRTC P2P signaling handlers (offer, answer, ICE candidates)
+    registerSignalingHandlers(io, socket, activeUsers, userToSocket);
 
     // User announces presence and initial canvas position
     socket.on('user:join', (payload = {}) => {
