@@ -1,6 +1,10 @@
 'use strict';
 
-require('dotenv').config();
+try {
+  require('dotenv').config();
+} catch (_) {
+  // dotenv not installed; fallback to process.env or defaults
+}
 
 const config = {
   port: parseInt(process.env.PORT, 10) || 5000,
