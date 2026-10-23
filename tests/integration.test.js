@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const mongoose = require('mongoose');
+const { MongoMemoryServer } = require('mongodb-memory-server');
 const { connectDB } = require('../db');
 const User = require('../User');
 const { findUsersNearCanvasPoint } = require('../proximityService');
@@ -11,26 +12,41 @@ const { canvasToGeoJSON } = require('../canvasToGeo');
 const SEED_NAMESPACE_PREFIX = 'seed:proxispeak:v1:';
 
 let dbAvailable = false;
+let dbUnavailableReason = null;
+let memoryServer = null;
 
 test.before(async () => {
   try {
     await connectDB();
     dbAvailable = true;
   } catch (err) {
-    dbAvailable = false;
-    console.log('MongoDB not available:', err.message);
+    console.log('MongoDB not available, falling back to mongodb-memory-server:', err.message);
+    try {
+      memoryServer = await MongoMemoryServer.create();
+      const uri = await memoryServer.getUri();
+      await mongoose.connect(uri);
+      await User.init();
+      dbAvailable = true;
+    } catch (memErr) {
+      dbAvailable = false;
+      dbUnavailableReason = 'mongodb-memory-server could not start: ' + memErr.message;
+      console.log(dbUnavailableReason);
+    }
   }
 });
 
 test.after(async () => {
-  if (dbAvailable && mongoose.connection.readyState === 1) {
+  if (mongoose.connection.readyState === 1) {
     await mongoose.connection.close();
+  }
+  if (memoryServer) {
+    await memoryServer.stop();
   }
 });
 
 function skipIfNoDb(t) {
   if (!dbAvailable) {
-    t.skip('MongoDB is not available; integration test skipped.');
+    t.skip(dbUnavailableReason || 'MongoDB is not available; integration test skipped.');
     return true;
   }
   return false;
@@ -45,27 +61,33 @@ test('integration: 2dsphere index exists on location in live database', async (t
 
 test('integration: seeding twice creates no duplicate seed users', async (t) => {
   if (skipIfNoDb(t)) return;
-  const countBefore = await User.countDocuments({ userId: { $regex: `^${SEED_NAMESPACE_PREFIX}` } });
   // Run the seed logic inline (idempotent upsert)
   const seedUsers = [
     { canvasX: 500, canvasY: 500, displayName: 'Seed User 1' },
     { canvasX: 550, canvasY: 500, displayName: 'Seed User 2' },
   ];
-  for (const userData of seedUsers) {
-    const [longitude, latitude] = canvasToGeoJSON(userData.canvasX, userData.canvasY);
-    const userId = `${SEED_NAMESPACE_PREFIX}${userData.displayName.toLowerCase().replace(/\s+/g, '-')}`;
-    await User.findOneAndUpdate(
-      { userId },
-      {
-        userId,
-        location: { type: 'Point', coordinates: [longitude, latitude] },
-        canvasX: userData.canvasX,
-        canvasY: userData.canvasY,
-        displayName: userData.displayName,
-      },
-      { upsert: true, new: true }
-    );
-  }
+  const upsertSeedUsers = async () => {
+    for (const userData of seedUsers) {
+      const [longitude, latitude] = canvasToGeoJSON(userData.canvasX, userData.canvasY);
+      const userId = `${SEED_NAMESPACE_PREFIX}${userData.displayName.toLowerCase().replace(/\s+/g, '-')}`;
+      await User.findOneAndUpdate(
+        { userId },
+        {
+          userId,
+          location: { type: 'Point', coordinates: [longitude, latitude] },
+          canvasX: userData.canvasX,
+          canvasY: userData.canvasY,
+          displayName: userData.displayName,
+        },
+        { upsert: true, new: true }
+      );
+    }
+  };
+
+  // First run creates the documents; the assertion below is about the second run.
+  await upsertSeedUsers();
+  const countBefore = await User.countDocuments({ userId: { $regex: `^${SEED_NAMESPACE_PREFIX}` } });
+  await upsertSeedUsers();
   const countAfter = await User.countDocuments({ userId: { $regex: `^${SEED_NAMESPACE_PREFIX}` } });
   assert.strictEqual(countAfter, countBefore, 'Seed count should not increase on re-run');
 });

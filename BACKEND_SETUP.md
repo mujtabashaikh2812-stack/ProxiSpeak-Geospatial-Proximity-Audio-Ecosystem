@@ -146,9 +146,36 @@ Tests:
 - tests/unit.test.js: 33 unit tests covering schema validation, coordinate
   conversion, pixel scaling, canvas y-axis direction, boundary values, and
   more. All pass without MongoDB.
-- tests/integration.test.js: real integration tests (2dsphere index existence,
-  repeatable seeding, requesting-user exclusion). Skipped when MongoDB is
-  unavailable. No fake passes.
+- tests/integration.test.js: 3 integration tests (2dsphere index existence,
+  repeatable seeding, requesting-user exclusion). Total is 36 tests: 33 pass
+  and 3 skip when no database is present. When a database is available, or
+  when mongodb-memory-server can start as a fallback, all 3 integration tests
+  run and pass.
+
+9. Verifying without installing MongoDB
+---------------------------------------
+
+Run the single command:
+
+    npm run verify:db
+
+This runs node verifyDb.js, which starts an in-memory single-node MongoDB on
+this laptop, connects Mongoose to it, and proves seven things:
+
+1. The location 2dsphere index really exists in the live database.
+2. Seeding is idempotent: the seed count is 10 after the first run and still
+   10 after the second run.
+3. The proximity query returns exactly four seed users within 100 canvas
+   pixels of the centre and none of the six outside users.
+4. A user at exactly 100 pixels is returned and a user at 100.5 pixels is not.
+5. excludeUserId removes the requesting user while the other three remain.
+6. The benchmark prints min, median, average, p95 and max for both the raw
+   $near query and the full proximity service, and states whether the full
+   service average stays under 20 milliseconds.
+7. The test database is dropped and the memory server is stopped.
+
+All timings printed by verifyDb.js come from an in-memory database on this
+laptop and are not production latency figures.
 
 9. Remaining limitations and decisions needed
 ---------------------------------------------

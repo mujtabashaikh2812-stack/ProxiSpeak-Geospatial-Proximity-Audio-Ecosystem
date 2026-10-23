@@ -112,12 +112,16 @@ async function runSeed() {
   }
 }
 
-runSeed()
-  .then(() => {
-    console.log('Seed completed successfully.');
-    process.exit(0);
-  })
-  .catch((error) => {
-    console.error('Seed failed:', error.message);
-    process.exit(1);
-  });
+module.exports = { runSeed };
+
+if (require.main === module) {
+  runSeed()
+    .then(() => {
+      console.log('Seed completed successfully.');
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error('Seed failed:', error.message);
+      process.exit(1);
+    });
+}
