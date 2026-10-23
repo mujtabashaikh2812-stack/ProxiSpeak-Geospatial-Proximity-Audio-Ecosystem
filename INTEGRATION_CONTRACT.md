@@ -44,15 +44,13 @@ MongoDB implementation.
 
 ## 4. Dependency conflict warning
 
-Versions pinned on this branch (`dev-kuldeep`):
+This branch now pins mongoose ^8.9.5 to match the server branch, and express has
+been removed from this branch's dependencies because no file on this branch
+requires it. The remaining difference is that the server branch additionally
+needs socket.io, cors and dotenv.
 
-- express ^5.3.0 (resolved 5.3.0)
-- mongoose ^9.11.2 (resolved 9.11.2)
-- mongodb-memory-server ^11.3.0 (dev only)
-
-The server branch pins its own versions in its own `package-lock.json`. One
-`package-lock.json` cannot satisfy both sides. The team must agree on versions
-before merging. No winner is chosen here.
+package.json and .env.example still conflict on merge because both sides add
+them. The lead resolves that in his own branch, not this one.
 
 ## 5. `.env.example` overlap
 
@@ -61,6 +59,14 @@ Variables needed by this branch:
 - `MONGODB_URI` - MongoDB connection URI (local fallback is `mongodb://127.0.0.1:27017/procsispeak`)
 - `SEED_DB` - set to `development` to allow the seed script to run
 
-The server branch needs its own variables, which are not visible from this
-branch. They must be taken from that branch's own `.env.example` before merge.
+Variables needed by the server branch, taken from that branch's own
+`.env.example`:
+
+- `PORT` - Express listen port, default 5000
+- `NODE_ENV` - runtime environment, default development
+- `CLIENT_ORIGIN` - comma-separated list of allowed client origins, default
+  `http://localhost:5173,http://localhost:3000`
+- `EARSHOT_RADIUS_PIXELS` - canvas pixel earshot radius, default 100
+- `MAX_PEERS_PER_ZONE` - maximum peers per spatial zone, default 20
+
 A merged `.env.example` must contain all variables from both sides.
