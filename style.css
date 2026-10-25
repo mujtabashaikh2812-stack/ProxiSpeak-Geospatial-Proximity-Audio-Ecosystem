@@ -1,0 +1,44 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #eef3ff;
+}
+
+.app {
+  display: flex;
+  gap: 20px;
+  padding: 20px;
+}
+
+.panel {
+  width: 260px;
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+h1 {
+  margin-top: 0;
+}
+
+.status {
+  background: #edf4ff;
+  padding: 10px;
+  border-radius: 8px;
+  margin: 15px 0;
+}
+
+#canvas {
+  background: #f7f9fc;
+  border: 1px solid #dfe7f3;
+  border-radius: 12px;
+  width: 980px;
+  height: 620px;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
