@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ProxiSpeak - Interactive Spatial Canvas Playground</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background: #0f172a;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    header {
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge {
+      background: #0369a1;
+      color: #e0f2fe;
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-weight: 600;
+    }
+    .status-bar {
+      display: flex;
+      gap: 16px;
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+    .status-bar span b {
+      color: #f8fafc;
+    }
+    main {
+      flex: 1;
+      display: flex;
+      position: relative;
+    }
+    #viewport-container {
+      flex: 1;
+      position: relative;
+      background: #0b1120;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    #sidebar {
+      width: 320px;
+      background: #1e293b;
+      border-left: 1px solid #334155;
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      gap: 16px;
+    }
+    .panel {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .panel h2 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+    .peer-list {
+      list-style: none;
+      font-size: 0.85rem;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+    .peer-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid #1e293b;
+    }
+    .peer-item:last-child {
+      border-bottom: none;
+    }
+    .audible-tag {
+      color: #4ade80;
+      font-weight: 600;
+    }
+    .inaudible-tag {
+      color: #64748b;
+    }
+    .log-list {
+      font-family: Consolas, monospace;
+      font-size: 0.75rem;
+      max-height: 160px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      color: #cbd5e1;
+    }
+    .spotlight-banner {
+      display: none;
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #ca8a04;
+      color: #fef08a;
+      padding: 8px 20px;
+      border-radius: 9999px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      box-shadow: 0 4px 14px rgba(202, 138, 4, 0.4);
+      z-index: 50;
+    }
+    .controls-help {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      line-height: 1.4;
+    }
+    .key {
+      background: #334155;
+      color: #f8fafc;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-weight: bold;
+    }
+  </style>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+  <header>
+    <h1>ProxiSpeak <span>Virtual Office</span> <span class="badge">Spatial Engine v1.1</span></h1>
+    <div class="status-bar">
+      <span>Zone: <b id="current-zone-label">Connecting...</b></span>
+      <span>Position: <b id="coords-label">(0, 0)</b></span>
+      <span>Active Peers: <b id="peers-count-label">0</b></span>
+    </div>
+  </header>
+
+  <main>
+    <div id="viewport-container">
+      <div id="spotlight-banner" class="spotlight-banner">🎙️ Town Hall Podium Active: Broadcasting to All!</div>
+      <canvas id="worldCanvas"></canvas>
+    </div>
+
+    <aside id="sidebar">
+      <div class="panel">
+        <h2>Keyboard Controls</h2>
+        <p class="controls-help">
+          Use <span class="key">W</span> <span class="key">A</span> <span class="key">S</span> <span class="key">D</span> or Arrow keys to move your avatar.<br>
+          Walk inside <b>Conference Room</b> or onto the <b>Podium</b>!
+        </p>
+      </div>
+
+      <div class="panel">
+        <h2>Audible Peers (&le; 100px or Stage)</h2>
+        <ul id="audible-peers-list" class="peer-list">
+          <li class="peer-item" style="color: #64748b;">No peers in audio range</li>
+        </ul>
+      </div>
+
+      <div class="panel" style="flex: 1; display: flex; flex-direction: column;">
+        <h2>Spatial Event Stream</h2>
+        <div id="event-log" class="log-list"></div>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    const canvas = document.getElementById('worldCanvas');
+    const ctx = canvas.getContext('2d');
+    const zoneLabel = document.getElementById('current-zone-label');
+    const coordsLabel = document.getElementById('coords-label');
+    const peersCountLabel = document.getElementById('peers-count-label');
+    const audibleList = document.getElementById('audible-peers-list');
+    const eventLog = document.getElementById('event-log');
+    const spotlightBanner = document.getElementById('spotlight-banner');
+
+    function resizeCanvas() {
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = canvas.parentElement.clientHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Local Player State
+    const myId = 'user-' + Math.floor(1000 + Math.random() * 9000);
+    const myName = 'Player-' + myId.slice(5);
+    const myAvatar = {
+      userId: myId,
+      displayName: myName,
+      x: 150 + Math.floor(Math.random() * 100),
+      y: 150 + Math.floor(Math.random() * 100),
+      radius: 14,
+      color: '#38bdf8',
+      speed: 4,
+      zone: 'Open Workspace',
+      isOnStage: false,
+    };
+
+    let officeZones = [];
+    const otherPeers = new Map(); // socketId -> { userId, displayName, x, y, isOnStage }
+    const audiblePeers = new Map(); // userId -> { distance, mode, effectiveVolume }
+
+    function logEvent(text) {
+      const entry = document.createElement('div');
+      const time = new Date().toLocaleTimeString().split(' ')[0];
+      entry.textContent = `[${time}] ${text}`;
+      eventLog.prepend(entry);
+    }
+
+    // Connect to Socket.io signaling server
+    const socket = io();
+
+    socket.on('connect', () => {
+      logEvent('Connected to Signaling Server');
+      socket.emit('user:join', {
+        userId: myAvatar.userId,
+        displayName: myAvatar.displayName,
+        canvasX: myAvatar.x,
+        canvasY: myAvatar.y,
+      });
+    });
+
+    socket.on('room:state', (state) => {
+      officeZones = state.zones || [];
+      if (state.peers) {
+        state.peers.forEach((p) => {
+          otherPeers.set(p.socketId, {
+            userId: p.userId,
+            displayName: p.displayName,
+            x: p.canvasX,
+            y: p.canvasY,
+            isOnStage: p.isOnStage,
+          });
+        });
+      }
+      updateHUD();
+      logEvent(`Joined room. ${otherPeers.size} other peers online.`);
+    });
+
+    socket.on('user:joined', (user) => {
+      otherPeers.set(user.socketId, {
+        userId: user.userId,
+        displayName: user.displayName,
+        x: user.canvasX,
+        y: user.canvasY,
+        isOnStage: user.isOnStage,
+      });
+      logEvent(`Peer joined: ${user.displayName}`);
+      updateHUD();
+    });
+
+    socket.on('player:moved', (data) => {
+      const peer = otherPeers.get(data.socketId);
+      if (peer) {
+        peer.x = data.canvasX;
+        peer.y = data.canvasY;
+        peer.isOnStage = data.isOnStage;
+      }
+    });
+
+    socket.on('user:left', (data) => {
+      otherPeers.delete(data.socketId);
+      audiblePeers.delete(data.userId);
+      logEvent(`Peer disconnected: ${data.userId}`);
+      updateHUD();
+    });
+
+    socket.on('proximity:enter', (data) => {
+      audiblePeers.set(data.peerId, {
+        distance: data.distance,
+        mode: data.mode,
+        volume: data.effectiveVolume,
+      });
+      logEvent(`Audible: entered ${data.displayName || data.peerId} range (${data.mode})`);
+      updateHUD();
+    });
+
+    socket.on('proximity:update', (data) => {
+      if (audiblePeers.has(data.peerId)) {
+        const item = audiblePeers.get(data.peerId);
+        item.distance = data.distance;
+        item.mode = data.mode;
+        item.volume = data.effectiveVolume;
+      }
+      updateHUD();
+    });
+
+    socket.on('proximity:leave', (data) => {
+      audiblePeers.delete(data.peerId);
+      logEvent(`Audio closed: left earshot of ${data.peerId}`);
+      updateHUD();
+    });
+
+    socket.on('zone:changed', (data) => {
+      myAvatar.zone = data.zoneName;
+      myAvatar.isOnStage = data.isOnStage;
+      zoneLabel.textContent = data.zoneName;
+      spotlightBanner.style.display = data.isOnStage ? 'block' : 'none';
+      logEvent(`Entered zone: ${data.zoneName}`);
+    });
+
+    socket.on('spotlight:speaker_entered', (data) => {
+      logEvent(`📢 ${data.message}`);
+    });
+
+    // Keyboard Input Handling
+    const keys = {};
+    window.addEventListener('keydown', (e) => (keys[e.key.toLowerCase()] = true));
+    window.addEventListener('keyup', (e) => (keys[e.key.toLowerCase()] = false));
+
+    function handleInput() {
+      let moved = false;
+      let dx = 0;
+      let dy = 0;
+
+      if (keys['w'] || keys['arrowup']) dy -= myAvatar.speed;
+      if (keys['s'] || keys['arrowdown']) dy += myAvatar.speed;
+      if (keys['a'] || keys['arrowleft']) dx -= myAvatar.speed;
+      if (keys['d'] || keys['arrowright']) dx += myAvatar.speed;
+
+      if (dx !== 0 || dy !== 0) {
+        myAvatar.x = Math.max(myAvatar.radius, Math.min(canvas.width - myAvatar.radius, myAvatar.x + dx));
+        myAvatar.y = Math.max(myAvatar.radius, Math.min(canvas.height - myAvatar.radius, myAvatar.y + dy));
+        coordsLabel.textContent = `(${Math.round(myAvatar.x)}, ${Math.round(myAvatar.y)})`;
+
+        socket.emit('player:move', { x: myAvatar.x, y: myAvatar.y });
+      }
+    }
+
+    function updateHUD() {
+      peersCountLabel.textContent = otherPeers.size;
+      audibleList.innerHTML = '';
+
+      if (audiblePeers.size === 0) {
+        audibleList.innerHTML = '<li class="peer-item" style="color: #64748b;">No peers in audio range</li>';
+      } else {
+        audiblePeers.forEach((info, peerId) => {
+          const li = document.createElement('li');
+          li.className = 'peer-item';
+          const volPercent = Math.round((info.volume || 1) * 100);
+          li.innerHTML = `<span>${peerId} <small>(${info.mode || 'p2p'})</small></span> <span class="audible-tag">${volPercent}% vol</span>`;
+          audibleList.appendChild(li);
+        });
+      }
+    }
+
+    // Render Loop (60 FPS)
+    function render() {
+      handleInput();
+
+      // Clear Canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // 1. Draw Office Grid Floor
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1;
+      const gridSize = 40;
+      for (let x = 0; x < canvas.width; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+
+      // 2. Draw Office Zones (Meeting Rooms & Spotlight Podium)
+      officeZones.forEach((zone) => {
+        const b = zone.bounds;
+        ctx.fillStyle = zone.theme.fill;
+        ctx.fillRect(b.x, b.y, b.width, b.height);
+
+        ctx.strokeStyle = zone.theme.border;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(b.x, b.y, b.width, b.height);
+
+        ctx.fillStyle = zone.theme.labelColor;
+        ctx.font = 'bold 13px sans-serif';
+        ctx.fillText(zone.name, b.x + 12, b.y + 24);
+      });
+
+      // 3. Draw 100px Earshot Radius around Local Avatar
+      ctx.beginPath();
+      ctx.arc(myAvatar.x, myAvatar.y, 100, 0, Math.PI * 2);
+      ctx.strokeStyle = myAvatar.isOnStage ? '#ca8a04' : 'rgba(56, 189, 248, 0.4)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 6]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 4. Draw Remote Peers
+      otherPeers.forEach((peer) => {
+        // Avatar circle
+        ctx.beginPath();
+        ctx.arc(peer.x, peer.y, 14, 0, Math.PI * 2);
+        ctx.fillStyle = peer.isOnStage ? '#eab308' : '#a855f7';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Name tag
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = '11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(peer.displayName, peer.x, peer.y - 20);
+
+        if (peer.isOnStage) {
+          ctx.fillStyle = '#fde047';
+          ctx.fillText('🎙️ Speaker', peer.x, peer.y + 28);
+        }
+      });
+
+      // 5. Draw Local Avatar
+      ctx.beginPath();
+      ctx.arc(myAvatar.x, myAvatar.y, myAvatar.radius, 0, Math.PI * 2);
+      ctx.fillStyle = myAvatar.isOnStage ? '#eab308' : myAvatar.color;
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Local Name tag
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(myAvatar.displayName + ' (You)', myAvatar.x, myAvatar.y - 20);
+
+      requestAnimationFrame(render);
+    }
+
+    requestAnimationFrame(render);
+  </script>
+</body>
+</html>

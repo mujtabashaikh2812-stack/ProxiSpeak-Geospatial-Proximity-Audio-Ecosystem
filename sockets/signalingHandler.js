@@ -1,24 +1,23 @@
 'use strict';
 
-const { isWithinEarshot, calculateDistance, EARSHOT_RADIUS } = require('../services/spatialEngine');
+const { calculateDistance, EARSHOT_RADIUS } = require('../services/spatialEngine');
+const { evaluateAcousticRelation } = require('../services/zoneManager');
 
 /**
- * WebRTC Signaling Handlers with Spatial Proximity Gating:
+ * WebRTC Signaling Handlers with Spatial & Acoustic Zone Gating:
  * Mediates SDP offer/answer handshakes and ICE candidate exchanges between browser peers.
- * Enforces the Infotact requirement: only permits audio handshakes if peers are within 100px.
+ * Enforces the physical earshot boundary, enclosed meeting room containment,
+ * and the Spotlight Podium global broadcast policy.
  */
 
 function registerSignalingHandlers(io, socket, userRegistry, userLookup) {
-  // Helper to resolve target socket ID and target user object
   function resolveTarget(target) {
     if (!target) return { socketId: null, user: null };
 
-    // Target is a socket.id
     if (userRegistry.has(target)) {
       return { socketId: target, user: userRegistry.get(target) };
     }
 
-    // Target is a userId
     const mappedSocketId = userLookup.get(target);
     if (mappedSocketId && userRegistry.has(mappedSocketId)) {
       return { socketId: mappedSocketId, user: userRegistry.get(mappedSocketId) };
@@ -27,7 +26,7 @@ function registerSignalingHandlers(io, socket, userRegistry, userLookup) {
     return { socketId: null, user: null };
   }
 
-  // Handle SDP Offer relay (Caller -> Server -> Receiver)
+  // Handle SDP Offer relay
   socket.on('webrtc:offer', (payload = {}) => {
     const { to, sdp } = payload;
     const { socketId: targetSocketId, user: targetUser } = resolveTarget(to);
@@ -44,7 +43,7 @@ function registerSignalingHandlers(io, socket, userRegistry, userLookup) {
       return;
     }
 
-    // Spatial Proximity Check: enforce 100px earshot gate
+    // Acoustic & Proximity check
     const distance = calculateDistance(
       senderUser.canvasX,
       senderUser.canvasY,
@@ -52,13 +51,15 @@ function registerSignalingHandlers(io, socket, userRegistry, userLookup) {
       targetUser.canvasY
     );
 
-    if (distance > EARSHOT_RADIUS) {
-      console.warn(`[Signaling] Offer blocked: ${senderUser.userId} and ${targetUser.userId} are ${distance}px apart (> ${EARSHOT_RADIUS}px limit)`);
+    const acoustic = evaluateAcousticRelation(senderUser, targetUser, distance, EARSHOT_RADIUS);
+
+    if (!acoustic.canHear) {
+      console.warn(`[Signaling] Offer blocked between ${senderUser.userId} and ${targetUser.userId}: ${acoustic.reason}`);
       socket.emit('webrtc:out-of-range', {
         to: targetUser.userId,
         distance,
-        limit: EARSHOT_RADIUS,
-        message: 'Cannot initiate audio: peer is outside the 100px earshot radius',
+        reason: acoustic.reason,
+        message: `Audio connection blocked: ${acoustic.reason}`,
       });
       return;
     }
@@ -70,13 +71,15 @@ function registerSignalingHandlers(io, socket, userRegistry, userLookup) {
       from: fromIdentifier,
       fromSocketId: socket.id,
       distance,
+      mode: acoustic.mode,
+      effectiveVolume: acoustic.effectiveVolume,
       sdp,
     });
 
-    console.log(`[Signaling] Relayed proximity-validated offer from ${fromIdentifier} to ${to} (${distance}px)`);
+    console.log(`[Signaling] Relayed offer (${acoustic.mode}) from ${fromIdentifier} to ${to} (dist: ${distance}px)`);
   });
 
-  // Handle SDP Answer relay (Receiver -> Server -> Caller)
+  // Handle SDP Answer relay
   socket.on('webrtc:answer', (payload = {}) => {
     const { to, sdp } = payload;
     const { socketId: targetSocketId, user: targetUser } = resolveTarget(to);
@@ -93,7 +96,6 @@ function registerSignalingHandlers(io, socket, userRegistry, userLookup) {
 
     const fromIdentifier = senderUser ? senderUser.userId : socket.id;
 
-    // Forward answer to caller peer
     io.to(targetSocketId).emit('webrtc:answer', {
       from: fromIdentifier,
       fromSocketId: socket.id,
@@ -104,7 +106,7 @@ function registerSignalingHandlers(io, socket, userRegistry, userLookup) {
     console.log(`[Signaling] Relayed answer from ${fromIdentifier} to ${to}`);
   });
 
-  // Handle ICE Candidate relay (Peer <-> Server <-> Peer)
+  // Handle ICE Candidate relay
   socket.on('webrtc:ice', (payload = {}) => {
     const { to, candidate } = payload;
     const { socketId: targetSocketId } = resolveTarget(to);
@@ -114,7 +116,6 @@ function registerSignalingHandlers(io, socket, userRegistry, userLookup) {
     const senderUser = userRegistry.get(socket.id);
     const fromIdentifier = senderUser ? senderUser.userId : socket.id;
 
-    // Forward ICE candidate to remote peer
     io.to(targetSocketId).emit('webrtc:ice', {
       from: fromIdentifier,
       fromSocketId: socket.id,
@@ -122,7 +123,7 @@ function registerSignalingHandlers(io, socket, userRegistry, userLookup) {
     });
   });
 
-  // Handle explicit peer audio disconnection (e.g. walked out of earshot)
+  // Handle explicit peer audio disconnection
   socket.on('webrtc:hangup', (payload = {}) => {
     const { to } = payload;
     const { socketId: targetSocketId } = resolveTarget(to);

@@ -1,5 +1,6 @@
 'use strict';
 
+const path = require('path');
 const http = require('http');
 const express = require('express');
 const cors = require('cors');
@@ -8,6 +9,7 @@ const { initSocketServer, getActiveUsers } = require('./sockets/socketManager');
 const {
   getNearbyPeersForUser,
   activeProximityPairs,
+  OFFICE_ZONES,
   EARSHOT_RADIUS,
 } = require('./services/spatialEngine');
 
@@ -34,6 +36,9 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve static frontend visual test playground
+app.use(express.static(path.join(__dirname, 'public')));
+
 // Health check endpoint for monitoring & uptime checks
 app.get('/api/health', (req, res) => {
   res.status(200).json({
@@ -42,6 +47,7 @@ app.get('/api/health', (req, res) => {
     uptimeSeconds: Math.floor(process.uptime()),
     activePeers: getActiveUsers().length,
     activeProximityClusters: activeProximityPairs.size,
+    zonesCount: OFFICE_ZONES.length,
     service: 'ProxiSpeak Signaling Server',
   });
 });
@@ -52,6 +58,14 @@ app.get('/api/users/active', (req, res) => {
   res.status(200).json({
     count: users.length,
     users,
+  });
+});
+
+// Office zones and acoustic layout endpoint
+app.get('/api/zones', (req, res) => {
+  res.status(200).json({
+    zones: OFFICE_ZONES,
+    defaultEarshotRadius: EARSHOT_RADIUS,
   });
 });
 
@@ -69,6 +83,7 @@ app.get('/api/proximity/nearby/:userId', (req, res) => {
   res.status(200).json({
     userId,
     canvasPosition: { x: target.canvasX, y: target.canvasY },
+    zone: target.zoneName || 'Open Workspace',
     earshotRadiusPixels: EARSHOT_RADIUS,
     count: nearby.length,
     nearbyPeers: nearby,
@@ -84,24 +99,10 @@ app.get('/api/proximity/pairs', (req, res) => {
   });
 });
 
-// Root welcome route
-app.get('/', (req, res) => {
-  res.status(200).json({
-    name: 'ProxiSpeak Geospatial Proximity Audio Server',
-    version: '1.0.0',
-    endpoints: {
-      health: '/api/health',
-      activeUsers: '/api/users/active',
-      nearbyPeers: '/api/proximity/nearby/:userId',
-      activePairs: '/api/proximity/pairs',
-    },
-  });
-});
-
 if (require.main === module) {
   server.listen(config.port, () => {
     console.log(`[ProxiSpeak Server] Running on http://localhost:${config.port}`);
-    console.log(`[ProxiSpeak Server] Environment: ${config.nodeEnv}`);
+    console.log(`[ProxiSpeak Server] Visual Playground: http://localhost:${config.port}/`);
     console.log(`[ProxiSpeak Server] Earshot radius: ${EARSHOT_RADIUS}px`);
   });
 }
