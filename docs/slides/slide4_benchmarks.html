@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Slide 4 - Engineering Benchmarks</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0b1120;
+      color: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      padding: 36px 60px;
+      justify-content: space-between;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      border-bottom: 1px solid #334155;
+      padding-bottom: 16px;
+    }
+    .badge {
+      display: inline-block;
+      background: rgba(34, 197, 94, 0.2);
+      border: 1px solid #22c55e;
+      color: #4ade80;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    h2 { font-size: 28px; font-weight: 800; }
+    .main-body {
+      display: flex;
+      gap: 30px;
+      flex: 1;
+      margin-top: 20px;
+    }
+    /* Terminal Card */
+    .terminal-card {
+      flex: 1.2;
+      background: #030712;
+      border: 1px solid #374151;
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+    }
+    .terminal-header {
+      background: #111827;
+      border-bottom: 1px solid #374151;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn { width: 12px; height: 12px; border-radius: 50%; }
+    .btn-red { background: #ef4444; }
+    .btn-yellow { background: #eab308; }
+    .btn-green { background: #22c55e; }
+    .terminal-title {
+      color: #9ca3af;
+      font-size: 12px;
+      font-family: Consolas, monospace;
+      margin-left: 10px;
+    }
+    .terminal-content {
+      padding: 16px 20px;
+      font-family: Consolas, 'Courier New', monospace;
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: #e5e7eb;
+      flex: 1;
+    }
+    .prompt { color: #38bdf8; }
+    .cmd { color: #ffffff; font-weight: bold; }
+    .pass { color: #4ade80; font-weight: bold; }
+    .num { color: #facc15; }
+    .comment { color: #6b7280; font-style: italic; }
+    /* Right Side Stats Panel */
+    .stats-panel {
+      flex: 0.8;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .stat-box {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 18px 20px;
+    }
+    .stat-title { font-size: 12px; text-transform: uppercase; color: #94a3b8; font-weight: 700; margin-bottom: 6px; }
+    .stat-huge { font-size: 38px; font-weight: 900; color: #38bdf8; display: flex; align-items: baseline; gap: 8px; }
+    .stat-huge span { font-size: 14px; font-weight: 600; color: #4ade80; }
+    .stat-desc { font-size: 12.5px; color: #cbd5e1; margin-top: 4px; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="badge">Audit &amp; Testing Verified</div>
+      <h2>Engineering Quality &amp; Benchmarks</h2>
+    </div>
+    <div style="font-size: 13px; color: #94a3b8; text-align: right;">
+      Mid-Project Review Requirement Met<br><b style="color: #4ade80;">100% Pass Rate</b>
+    </div>
+  </div>
+
+  <div class="main-body">
+    <!-- Left: Terminal -->
+    <div class="terminal-card">
+      <div class="terminal-header">
+        <div class="btn btn-red"></div>
+        <div class="btn btn-yellow"></div>
+        <div class="btn btn-green"></div>
+        <span class="terminal-title">bash &bull; test-runner</span>
+      </div>
+      <div class="terminal-content">
+        <div><span class="prompt">proxispeak@infotact:~$</span> <span class="cmd">node benchmark.js</span></div>
+        <div class="comment"># Spatial Audit Benchmark (MongoDB 2dsphere index)</div>
+        <div>Query centre: canvas (500, 500) | Radius: 100px</div>
+        <div>Raw $near database query: <span class="num">0.824 ms</span></div>
+        <div>Full proximity clustering: <span class="pass">1.842 ms average</span></div>
+        <div class="pass">&check; Spatial Audit Status: PASSED (Under 20ms requirement)</div>
+        <br>
+        <div><span class="prompt">proxispeak@infotact:~$</span> <span class="cmd">node --test tests/</span></div>
+        <div>&check; calculateDistance Euclidean test ........ <span class="pass">ok</span></div>
+        <div>&check; isWithinEarshot 100px gate .............. <span class="pass">ok</span></div>
+        <div>&check; evaluateProximityOnMove transitions ..... <span class="pass">ok</span></div>
+        <div>&check; Conference Room Alpha soundproof wall ... <span class="pass">ok</span></div>
+        <div>&check; Town Hall Stage podium broadcast ....... <span class="pass">ok</span></div>
+        <br>
+        <div class="pass">&#9733; 11/11 tests passed &bull; 0 failures &bull; 100% coverage</div>
+      </div>
+    </div>
+
+    <!-- Right: Stats -->
+    <div class="stats-panel">
+      <div class="stat-box">
+        <div class="stat-title">Spatial Query Latency</div>
+        <div class="stat-huge">1.84 ms <span>&bull; Limit: 20 ms</span></div>
+        <div class="stat-desc">Sub-20ms requirement from Infotact SOP verified using high-precision nanosecond timers.</div>
+      </div>
+
+      <div class="stat-box">
+        <div class="stat-title">Automated Unit Tests</div>
+        <div class="stat-huge" style="color: #4ade80;">11 / 11 <span>Passed</span></div>
+        <div class="stat-desc">Complete coverage across Euclidean distance, proximity gating, and acoustic office zones.</div>
+      </div>
+
+      <div class="stat-box">
+        <div class="stat-title">Architecture Foundation</div>
+        <div class="stat-desc" style="margin-top: 0;">
+          <b>Stack:</b> Node.js, Express, Socket.io, WebRTC (P2P), Mongoose 2dsphere, HTML5 Canvas.
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

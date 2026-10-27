@@ -11,6 +11,7 @@ const {
   OFFICE_ZONES,
   EARSHOT_RADIUS,
 } = require('../services/spatialEngine');
+const { defaultThrottle } = require('../services/throttleEngine');
 
 /**
  * In-memory active user registry
@@ -65,6 +66,9 @@ function initSocketServer(httpServer) {
       activeUsers.set(socket.id, userData);
       userToSocket.set(userData.userId, socket.id);
 
+      // Register initial position with throttle engine
+      defaultThrottle.processMovement(userData.userId, userData.canvasX, userData.canvasY);
+
       const allOtherUsers = Array.from(activeUsers.values()).filter(
         (u) => u.socketId !== socket.id
       );
@@ -94,7 +98,7 @@ function initSocketServer(httpServer) {
       console.log(`[Socket] User joined: ${userData.displayName} at [${userData.canvasX}, ${userData.canvasY}] (${userData.zoneName})`);
     });
 
-    // Player movement broadcast & real-time proximity evaluation
+    // Player movement broadcast with 30Hz Rate-Limiting & Delta Compression
     socket.on('player:move', (coords = {}) => {
       const user = activeUsers.get(socket.id);
       if (!user) return;
@@ -103,6 +107,12 @@ function initSocketServer(httpServer) {
       if (typeof x === 'number' && typeof y === 'number') {
         user.canvasX = x;
         user.canvasY = y;
+
+        // Rate-limit check (30Hz tick & sub-pixel delta compression)
+        const throttleCheck = defaultThrottle.processMovement(user.userId, x, y);
+        if (!throttleCheck.shouldBroadcast) {
+          return; // Suppress redundant frame
+        }
 
         // Check if user transitioned to a new zone or podium
         const newZone = detectZone(x, y);
@@ -135,7 +145,7 @@ function initSocketServer(httpServer) {
           }
         }
 
-        // 1. Broadcast movement
+        // 1. Broadcast throttled movement to other peers
         socket.broadcast.emit('player:moved', {
           socketId: socket.id,
           userId: user.userId,
@@ -158,6 +168,7 @@ function initSocketServer(httpServer) {
       if (user) {
         activeUsers.delete(socket.id);
         userToSocket.delete(user.userId);
+        defaultThrottle.cleanupPlayer(user.userId);
 
         const remainingUsers = Array.from(activeUsers.values());
 

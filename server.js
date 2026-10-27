@@ -12,6 +12,7 @@ const {
   OFFICE_ZONES,
   EARSHOT_RADIUS,
 } = require('./services/spatialEngine');
+const { defaultThrottle } = require('./services/throttleEngine');
 
 const app = express();
 const server = http.createServer(app);
@@ -99,11 +100,20 @@ app.get('/api/proximity/pairs', (req, res) => {
   });
 });
 
+// Network throttle & performance statistics endpoint (Week 3 Scaling)
+app.get('/api/performance/throttle', (req, res) => {
+  res.status(200).json({
+    service: 'Coordinate Throttle & Delta Compressor',
+    performance: defaultThrottle.getStats(),
+  });
+});
+
 if (require.main === module) {
   server.listen(config.port, () => {
     console.log(`[ProxiSpeak Server] Running on http://localhost:${config.port}`);
     console.log(`[ProxiSpeak Server] Visual Playground: http://localhost:${config.port}/`);
     console.log(`[ProxiSpeak Server] Earshot radius: ${EARSHOT_RADIUS}px`);
+    console.log(`[ProxiSpeak Server] Movement throttle active: 30Hz tick rate`);
   });
 }
 

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Slide 3 - Acoustic Zones</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0b1120;
+      color: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      padding: 40px 60px;
+      justify-content: space-between;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .badge {
+      display: inline-block;
+      background: rgba(3, 105, 161, 0.25);
+      border: 1px solid #0284c7;
+      color: #38bdf8;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    h2 { font-size: 36px; font-weight: 800; color: #f8fafc; }
+    p.sub { font-size: 16px; color: #94a3b8; }
+    .cards-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      flex: 1;
+      margin-top: 20px;
+    }
+    .zone-card {
+      background: #1e293b;
+      border-radius: 16px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+    }
+    .card-room {
+      border: 2px solid #0284c7;
+      background: radial-gradient(circle at 10% 10%, rgba(2, 132, 199, 0.15), #0f172a 70%);
+    }
+    .card-podium {
+      border: 2px solid #ca8a04;
+      background: radial-gradient(circle at 10% 10%, rgba(202, 138, 4, 0.15), #0f172a 70%);
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+    .icon-box {
+      width: 48px; height: 48px; border-radius: 12px;
+      display: flex; justify-content: center; align-items: center; font-size: 24px;
+    }
+    .box-room { background: #0369a1; }
+    .box-podium { background: #854d0e; }
+    .card-title h3 { font-size: 22px; font-weight: 700; color: #f8fafc; margin-bottom: 4px; }
+    .card-title span { font-size: 13px; color: #94a3b8; }
+    .feature-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .feature-list li {
+      font-size: 15px;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .check { color: #38bdf8; font-weight: bold; }
+    .check-gold { color: #facc15; font-weight: bold; }
+    .zone-banner {
+      padding: 12px 18px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      text-align: center;
+    }
+    .banner-room { background: rgba(2, 132, 199, 0.2); color: #38bdf8; border: 1px solid rgba(2, 132, 199, 0.4); }
+    .banner-podium { background: rgba(202, 138, 4, 0.2); color: #facc15; border: 1px solid rgba(202, 138, 4, 0.4); }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="badge">Acoustic Boundary Engine</div>
+    <h2>Smart Virtual Office Zones</h2>
+    <p class="sub">Dynamic sound isolation and broadcast zones powered by <code>services/zoneManager.js</code></p>
+  </div>
+
+  <div class="cards-grid">
+    <!-- Card 1: Conference Room Alpha -->
+    <div class="zone-card card-room">
+      <div>
+        <div class="card-header">
+          <div class="icon-box box-room">🔒</div>
+          <div class="card-title">
+            <h3>Conference Room Alpha</h3>
+            <span>Acoustic Glass Isolation</span>
+          </div>
+        </div>
+        <ul class="feature-list">
+          <li><span class="check">&bull;</span> Soundproof containment: Sound cannot leak into hallways</li>
+          <li><span class="check">&bull;</span> Shared Room Group: All participants hear each other clearly</li>
+          <li><span class="check">&bull;</span> External peers outside the room are automatically muted</li>
+          <li><span class="check">&bull;</span> Ideal for team scrums and private discussions</li>
+        </ul>
+      </div>
+      <div class="zone-banner banner-room">
+        Status: 🔒 Room Audio (95% Fixed Volume)
+      </div>
+    </div>
+
+    <!-- Card 2: Town Hall Podium -->
+    <div class="zone-card card-podium">
+      <div>
+        <div class="card-header">
+          <div class="icon-box box-podium">🎙️</div>
+          <div class="card-title">
+            <h3>Town Hall Stage &amp; Podium</h3>
+            <span>Global Spotlight Broadcast</span>
+          </div>
+        </div>
+        <ul class="feature-list">
+          <li><span class="check-gold">&bull;</span> Overrides 100px proximity limit: Broadcasts to everyone</li>
+          <li><span class="check-gold">&bull;</span> Speaker receives golden glowing aura &amp; stage badge</li>
+          <li><span class="check-gold">&bull;</span> Volume locked at 100% with centered stereo panning</li>
+          <li><span class="check-gold">&bull;</span> Designed for all-hands, CEO briefings, and team demos</li>
+        </ul>
+      </div>
+      <div class="zone-banner banner-podium">
+        Status: 📢 Stage Active (100% Global Broadcast)
+      </div>
+    </div>
+  </div>
+</body>
+</html>
