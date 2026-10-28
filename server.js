@@ -13,6 +13,7 @@ const {
   EARSHOT_RADIUS,
 } = require('./services/spatialEngine');
 const { defaultThrottle } = require('./services/throttleEngine');
+const { checkRedisHealth } = require('./services/redisClient');
 
 const app = express();
 const server = http.createServer(app);
@@ -51,6 +52,12 @@ app.get('/api/health', (req, res) => {
     zonesCount: OFFICE_ZONES.length,
     service: 'ProxiSpeak Signaling Server',
   });
+});
+
+// Redis pub/sub cluster health & resilience diagnostics (Week 3 Scaling)
+app.get('/api/health/redis', async (req, res) => {
+  const health = await checkRedisHealth();
+  res.status(200).json(health);
 });
 
 // Active users inspection endpoint
