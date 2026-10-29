@@ -12,6 +12,7 @@ const {
   EARSHOT_RADIUS,
 } = require('../services/spatialEngine');
 const { defaultThrottle } = require('../services/throttleEngine');
+const { SocketClusterAdapter } = require('../services/socketClusterAdapter');
 
 /**
  * In-memory active user registry
@@ -23,7 +24,9 @@ const activeUsers = new Map();
  */
 const userToSocket = new Map();
 
-function initSocketServer(httpServer) {
+let clusterAdapter = null;
+
+function initSocketServer(httpServer, options = {}) {
   const io = new Server(httpServer, {
     cors: {
       origin: config.clientOrigins,
@@ -34,11 +37,22 @@ function initSocketServer(httpServer) {
     pingTimeout: 20000,
   });
 
+  // Initialize Socket.io Redis Cluster Adapter for horizontal scaling
+  clusterAdapter = new SocketClusterAdapter(io, {
+    localUsers: activeUsers,
+    localUserToSocket: userToSocket,
+    earshotRadius: EARSHOT_RADIUS,
+    ...options.clusterOptions,
+  });
+  clusterAdapter.init().catch((err) => {
+    console.warn(`[SocketServer] Cluster adapter init warning: ${err.message}`);
+  });
+
   io.on('connection', (socket) => {
     console.log(`[Socket] Peer connected: ${socket.id}`);
 
-    // Register WebRTC P2P signaling handlers
-    registerSignalingHandlers(io, socket, activeUsers, userToSocket);
+    // Register WebRTC P2P signaling handlers (with cluster relay support)
+    registerSignalingHandlers(io, socket, activeUsers, userToSocket, clusterAdapter);
 
     // User announces presence and initial canvas position
     socket.on('user:join', (payload = {}) => {
@@ -73,19 +87,28 @@ function initSocketServer(httpServer) {
         (u) => u.socketId !== socket.id
       );
 
-      const nearbyPeers = getNearbyPeersForUser(userData, allOtherUsers, EARSHOT_RADIUS);
+      const allClusterPeers = clusterAdapter
+        ? clusterAdapter.getAllClusterUsers().filter((u) => u.userId !== userData.userId)
+        : allOtherUsers;
+
+      const nearbyPeers = getNearbyPeersForUser(userData, allClusterPeers, EARSHOT_RADIUS);
 
       // Send initial room layout & state to joining user
       socket.emit('room:state', {
         user: userData,
-        peers: allOtherUsers,
+        peers: allClusterPeers,
         nearbyPeers,
         zones: OFFICE_ZONES,
         earshotRadius: EARSHOT_RADIUS,
       });
 
-      // Notify all other clients about the newly joined player
+      // Notify all other clients on this node about the newly joined player
       socket.broadcast.emit('user:joined', userData);
+
+      // Broadcast new player across Redis cluster bus
+      if (clusterAdapter) {
+        clusterAdapter.broadcast('user:joined', userData);
+      }
 
       // Initial proximity check
       const initialTransitions = evaluateProximityOnMove(
@@ -136,12 +159,30 @@ function initSocketServer(httpServer) {
             isOnStage: user.isOnStage,
           });
 
+          if (clusterAdapter) {
+            clusterAdapter.broadcast('peer:zone_changed', {
+              userId: user.userId,
+              socketId: socket.id,
+              zone: newZone.id,
+              zoneName: newZone.name,
+              isOnStage: user.isOnStage,
+            });
+          }
+
           if (user.isOnStage) {
             io.emit('spotlight:speaker_entered', {
               userId: user.userId,
               displayName: user.displayName,
               message: `${user.displayName} is speaking on the Town Hall Podium!`,
             });
+
+            if (clusterAdapter) {
+              clusterAdapter.broadcast('spotlight:speaker_entered', {
+                userId: user.userId,
+                displayName: user.displayName,
+                message: `${user.displayName} is speaking on the Town Hall Podium!`,
+              });
+            }
           }
         }
 
@@ -154,6 +195,20 @@ function initSocketServer(httpServer) {
           zone: user.zone,
           isOnStage: user.isOnStage,
         });
+
+        // Broadcast across Redis cluster bus
+        if (clusterAdapter) {
+          clusterAdapter.broadcast('player:moved', {
+            socketId: socket.id,
+            userId: user.userId,
+            displayName: user.displayName,
+            canvasX: user.canvasX,
+            canvasY: user.canvasY,
+            zone: user.zone,
+            zoneName: user.zoneName,
+            isOnStage: user.isOnStage,
+          });
+        }
 
         // 2. Evaluate acoustic & proximity transitions
         const allUsers = Array.from(activeUsers.values());
@@ -185,6 +240,14 @@ function initSocketServer(httpServer) {
           userId: user.userId,
           reason,
         });
+
+        if (clusterAdapter) {
+          clusterAdapter.broadcast('user:left', {
+            socketId: socket.id,
+            userId: user.userId,
+            reason,
+          });
+        }
 
         console.log(`[Socket] User left: ${user.displayName} (${user.userId}) - Reason: ${reason}`);
       }
@@ -251,10 +314,15 @@ function getSocketByUserId(userId) {
   return userToSocket.get(userId) || null;
 }
 
+function getClusterAdapter() {
+  return clusterAdapter;
+}
+
 module.exports = {
   initSocketServer,
   getActiveUsers,
   getSocketByUserId,
+  getClusterAdapter,
   activeUsers,
   userToSocket,
 };

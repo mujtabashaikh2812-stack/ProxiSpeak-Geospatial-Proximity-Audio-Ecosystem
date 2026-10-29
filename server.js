@@ -5,7 +5,7 @@ const http = require('http');
 const express = require('express');
 const cors = require('cors');
 const config = require('./config/serverConfig');
-const { initSocketServer, getActiveUsers } = require('./sockets/socketManager');
+const { initSocketServer, getActiveUsers, getClusterAdapter } = require('./sockets/socketManager');
 const {
   getNearbyPeersForUser,
   activeProximityPairs,
@@ -58,6 +58,25 @@ app.get('/api/health', (req, res) => {
 app.get('/api/health/redis', async (req, res) => {
   const health = await checkRedisHealth();
   res.status(200).json(health);
+});
+
+// Cluster status & multi-instance diagnostics (Week 3 Scaling)
+app.get('/api/cluster/status', (req, res) => {
+  const adapter = getClusterAdapter();
+  if (!adapter) {
+    return res.status(200).json({ status: 'standalone', clusterActive: false });
+  }
+  res.status(200).json(adapter.getClusterStatus());
+});
+
+// Cluster-wide all connected peers inspection endpoint
+app.get('/api/cluster/peers', (req, res) => {
+  const adapter = getClusterAdapter();
+  const allPeers = adapter ? adapter.getAllClusterUsers() : getActiveUsers();
+  res.status(200).json({
+    totalClusterPeers: allPeers.length,
+    peers: allPeers,
+  });
 });
 
 // Active users inspection endpoint

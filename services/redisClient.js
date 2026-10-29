@@ -26,9 +26,22 @@ class InMemoryRedisMock extends EventEmitter {
   async subscribe(...channels) {
     for (const ch of channels) {
       if (typeof ch === 'string') {
-        InMemoryRedisMock.globalBus.on(ch, (msg) => {
+        const listener = (msg) => {
           this.emit('message', ch, msg);
-        });
+        };
+        this.channels.set(ch, listener);
+        InMemoryRedisMock.globalBus.on(ch, listener);
+      }
+    }
+    return channels.length;
+  }
+
+  async unsubscribe(...channels) {
+    for (const ch of channels) {
+      const listener = this.channels.get(ch);
+      if (listener) {
+        InMemoryRedisMock.globalBus.removeListener(ch, listener);
+        this.channels.delete(ch);
       }
     }
     return channels.length;
@@ -39,6 +52,10 @@ class InMemoryRedisMock extends EventEmitter {
   }
 
   async disconnect() {
+    for (const [ch, listener] of this.channels.entries()) {
+      InMemoryRedisMock.globalBus.removeListener(ch, listener);
+    }
+    this.channels.clear();
     this.status = 'end';
     return true;
   }
@@ -46,6 +63,9 @@ class InMemoryRedisMock extends EventEmitter {
 
 // Shared bus between in-memory pub and sub instances
 InMemoryRedisMock.globalBus = new EventEmitter();
+InMemoryRedisMock.resetBus = () => {
+  InMemoryRedisMock.globalBus.removeAllListeners();
+};
 
 let primaryClient = null;
 let pubClient = null;
