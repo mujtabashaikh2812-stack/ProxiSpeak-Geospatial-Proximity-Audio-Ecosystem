@@ -19,6 +19,7 @@ const spotlightAlert = document.getElementById('spotlightAlert');
 
 // Proximity & Spatial constants
 const EARSHOT_RADIUS = 100; // px
+const LERP_FACTOR = 0.2;
 
 // Local Player State
 const me = {
@@ -109,6 +110,8 @@ if (typeof io !== 'undefined') {
             name: p.displayName,
             x: p.canvasX,
             y: p.canvasY,
+            targetX: p.canvasX,
+            targetY: p.canvasY,
             color: '#a855f7',
             isOnStage: p.isOnStage,
           });
@@ -119,11 +122,20 @@ if (typeof io !== 'undefined') {
     socket.on('player:moved', (data) => {
       let p = peers.get(data.userId);
       if (!p) {
-        p = { id: data.userId, name: data.displayName || data.userId, color: '#a855f7' };
+        p = {
+          id: data.userId,
+          name: data.displayName || data.userId,
+          x: data.canvasX,
+          y: data.canvasY,
+          targetX: data.canvasX,
+          targetY: data.canvasY,
+          color: '#a855f7',
+        };
         peers.set(data.userId, p);
+      } else {
+        p.targetX = data.canvasX;
+        p.targetY = data.canvasY;
       }
-      p.x = data.canvasX;
-      p.y = data.canvasY;
       p.isOnStage = data.isOnStage;
     });
 
@@ -137,9 +149,34 @@ if (typeof io !== 'undefined') {
 
 // Fallback: Populate mock peers if offline
 if (!isLiveSocket) {
-  peers.set('p-1', { id: 'p-1', name: 'Aisha (Dev)', x: 500, y: 390, color: '#2ecf7d' });
-  peers.set('p-2', { id: 'p-2', name: 'Nikhil (Lead)', x: 740, y: 130, color: '#eab308', isOnStage: true });
-  peers.set('p-3', { id: 'p-3', name: 'Priya (UI)', x: 670, y: 400, color: '#ec4899' });
+  peers.set('p-1', {
+    id: 'p-1',
+    name: 'Aisha (Dev)',
+    x: 500,
+    y: 390,
+    targetX: 500,
+    targetY: 390,
+    color: '#2ecf7d',
+  });
+  peers.set('p-2', {
+    id: 'p-2',
+    name: 'Nikhil (Lead)',
+    x: 740,
+    y: 130,
+    targetX: 740,
+    targetY: 130,
+    color: '#eab308',
+    isOnStage: true,
+  });
+  peers.set('p-3', {
+    id: 'p-3',
+    name: 'Priya (UI)',
+    x: 670,
+    y: 400,
+    targetX: 670,
+    targetY: 400,
+    color: '#ec4899',
+  });
 }
 
 // Keyboard Input Handler
@@ -336,6 +373,10 @@ function drawScene() {
 // 60 FPS Render Loop
 function animate() {
   movePlayer();
+  peers.forEach((peer) => {
+    peer.x += (peer.targetX - peer.x) * LERP_FACTOR;
+    peer.y += (peer.targetY - peer.y) * LERP_FACTOR;
+  });
   updateHUD();
   drawScene();
   requestAnimationFrame(animate);
