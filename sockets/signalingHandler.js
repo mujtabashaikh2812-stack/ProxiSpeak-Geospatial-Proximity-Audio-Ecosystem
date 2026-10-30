@@ -2,6 +2,7 @@
 
 const { calculateDistance, EARSHOT_RADIUS } = require('../services/spatialEngine');
 const { evaluateAcousticRelation } = require('../services/zoneManager');
+const { defaultMeshManager } = require('../services/meshManager');
 
 /**
  * WebRTC Signaling Handlers with Spatial & Acoustic Zone Gating:
@@ -34,6 +35,16 @@ function registerSignalingHandlers(io, socket, userRegistry, userLookup, cluster
 
     if (!senderUser) {
       socket.emit('webrtc:error', { message: 'Caller must join with user:join first' });
+      return;
+    }
+
+    // Dynamic Mesh Connection Capping Check
+    if (!defaultMeshManager.canEstablishConnection(senderUser.userId, to)) {
+      console.warn(`[Signaling] Offer suppressed: Mesh connection cap reached between ${senderUser.userId} and ${to}`);
+      socket.emit('webrtc:mesh-capped', {
+        to,
+        message: 'Mesh connection cap reached. Audio connection prioritized for closer peers.',
+      });
       return;
     }
 

@@ -14,6 +14,7 @@ const {
 } = require('./services/spatialEngine');
 const { defaultThrottle } = require('./services/throttleEngine');
 const { checkRedisHealth } = require('./services/redisClient');
+const { defaultMeshManager } = require('./services/meshManager');
 
 const app = express();
 const server = http.createServer(app);
@@ -40,6 +41,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Serve static frontend visual test playground
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Serve Akhila's 2D canvas client demo
+app.use('/akhila', express.static(path.join(__dirname, 'client-akhila')));
 
 // Health check endpoint for monitoring & uptime checks
 app.get('/api/health', (req, res) => {
@@ -132,6 +136,11 @@ app.get('/api/performance/throttle', (req, res) => {
     service: 'Coordinate Throttle & Delta Compressor',
     performance: defaultThrottle.getStats(),
   });
+});
+
+// WebRTC Mesh capping & connection allocation performance diagnostics (Week 3 Scaling)
+app.get('/api/performance/mesh', (req, res) => {
+  res.status(200).json(defaultMeshManager.getStats());
 });
 
 if (require.main === module) {
