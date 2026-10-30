@@ -86,6 +86,50 @@ function pixelsToMetres(radiusPixels, scaleMetresPerPixel) {
   return radiusPixels * scaleMetresPerPixel;
 }
 
+// Projects an array of canvas pixel rings (GeoJSON Polygon coordinate shape) into
+// a GeoJSON Polygon coordinate ring set. Closes any open ring by repeating the
+// first position at the end.
+function canvasRingToGeoRing(rings) {
+  if (!Array.isArray(rings) || rings.length === 0) {
+    throw new Error('canvasRingToGeoRing: input must be an array of at least one ring');
+  }
+  const result = [];
+  for (let i = 0; i < rings.length; i++) {
+    const ring = rings[i];
+    if (!Array.isArray(ring) || ring.length < 3) {
+      throw new Error('canvasRingToGeoRing: each ring must have at least three positions');
+    }
+    const projected = [];
+    for (let j = 0; j < ring.length; j++) {
+      const pos = ring[j];
+      if (!Array.isArray(pos) || pos.length !== 2) {
+        throw new Error('canvasRingToGeoRing: each position must be a [x, y] pair');
+      }
+      if (!isFiniteNumber(pos[0]) || !isFiniteNumber(pos[1])) {
+        throw new Error('canvasRingToGeoRing: every coordinate must be a finite number');
+      }
+      projected.push(canvasToGeoJSON(pos[0], pos[1]));
+    }
+    // distinct positions check: at least 3 distinct before closing
+    const distinctSet = new Set();
+    const body = (projected.length > 1 && projected[0][0] === projected[projected.length - 1][0] && projected[0][1] === projected[projected.length - 1][1])
+      ? projected.slice(0, -1)
+      : projected;
+    for (const p of body) distinctSet.add(p.join(','));
+    if (distinctSet.size < 3) {
+      throw new Error('canvasRingToGeoRing: each ring must contain at least three distinct positions');
+    }
+    // close ring if not closed
+    const first = projected[0];
+    const last = projected[projected.length - 1];
+    if (first[0] !== last[0] || first[1] !== last[1]) {
+      projected.push([first[0], first[1]]);
+    }
+    result.push(projected);
+  }
+  return result;
+}
+
 module.exports = {
   canvasToGeoJSON,
   pixelsToMetres,
@@ -94,4 +138,5 @@ module.exports = {
   ORIGIN_LATITUDE,
   MAX_CANVAS_COORD,
   isFiniteNumber,
+  canvasRingToGeoRing,
 };
