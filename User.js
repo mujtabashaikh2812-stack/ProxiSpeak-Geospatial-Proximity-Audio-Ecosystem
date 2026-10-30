@@ -66,6 +66,11 @@ const UserSchema = new mongoose.Schema(
         message: 'canvasY must be a finite number',
       },
     },
+    lastSeenAt: {
+      type: Date,
+      required: false,
+      default: Date.now, // used by session pruning
+    },
   },
   { strict: true }
 );

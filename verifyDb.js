@@ -5,6 +5,7 @@ const User = require('./User');
 const { runSeed } = require('./seed');
 const { findUsersNearCanvasPoint } = require('./proximityService');
 const { canvasToGeoJSON } = require('./canvasToGeo');
+const { pruneStaleSessions } = require('./sessionPruner');
 
 const QUERY_CENTRE_X = 500;
 const QUERY_CENTRE_Y = 500;
@@ -189,9 +190,26 @@ const seedResult1 = await runSeed();
     record('Check 6: benchmark measured (min/median/avg/p95/max printed)', true,
       'fullServiceAvg=' + svcStats.avg.toFixed(3) + 'ms under20ms=' + under20ms);
     console.log('  Full service average ' + (under20ms ? 'is' : 'is NOT') + ' under 20 milliseconds.');
-    // ---- Check 7: cleanup ----
+    // ---- Check 7: pruning dryRun reports 2 stale and deletes nothing ----
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    await User.create([
+      { userId: 'prune:test:1', location: { type: 'Point', coordinates: [0, 0] }, canvasX: 0, canvasY: 0, lastSeenAt: twoHoursAgo },
+      { userId: 'prune:test:2', location: { type: 'Point', coordinates: [0, 0] }, canvasX: 0, canvasY: 0, lastSeenAt: twoHoursAgo },
+      { userId: 'prune:test:3', location: { type: 'Point', coordinates: [0, 0] }, canvasX: 0, canvasY: 0 },
+    ]);
+    const dry = await pruneStaleSessions({ maxIdleMinutes: 30, dryRun: true });
+    const dryOk = dry.staleCount === 2 && dry.deletedCount === 0;
+    const real = await pruneStaleSessions({ maxIdleMinutes: 30, dryRun: false });
+    const remaining = await User.countDocuments({ userId: /^prune:test:/ });
+    const realOk = real.deletedCount === 2 && remaining === 1;
+    const pruneOk = dryOk && realOk;
+    record('Check 7: pruning dryRun keeps 2 stale, dryRun false deletes 2', pruneOk,
+      'dryStale=' + dry.staleCount + ' dryDeleted=' + dry.deletedCount + ' realDeleted=' + real.deletedCount + ' remaining=' + remaining);
+    await User.deleteMany({ userId: /^prune:test:/ });
+
+    // ---- Check 8: cleanup ----
     await mongoose.connection.dropDatabase();
-    record('Check 7: test database dropped and memory server stopped', true, 'dropped');
+    record('Check 8: test database dropped and memory server stopped', true, 'dropped');
 
   } finally {
     if (mongoose.connection.readyState === 1) {

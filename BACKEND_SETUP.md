@@ -195,4 +195,7 @@ laptop and are not production latency figures.
 ----------------
 
 package.json declares ISC. README badge shows MIT. This mismatch is reported
-for the team to decide. The license field was not changed based on a badge.
+11. Session pruning
+-------------------
+
+pruneStaleSessions in sessionPruner.js finds users whose lastSeenAt is older than the cut-off (default 30 minutes) and either deletes them (dryRun false) or only reports them (dryRun true). dryRun defaults to true so nothing is deleted by accident. Run a real prune with: node -e "require('./sessionPruner').pruneStaleSessions({maxIdleMinutes:30,dryRun:false}).then(console.log)"

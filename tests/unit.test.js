@@ -289,3 +289,17 @@ test('User: repeatable seed userId values do not create duplicates (namespace ch
   const userId2 = 'seed:proxispeak:v1:seed-user-1';
   assert.strictEqual(userId1, userId2, 'Same seed namespace prefix yields same userId');
 });
+
+const { pruneStaleSessions } = require('../sessionPruner');
+
+test('pruneStaleSessions: non-numeric maxIdleMinutes throws', async () => {
+  await assert.rejects(() => pruneStaleSessions({ maxIdleMinutes: 'abc' }), /finite positive number/);
+});
+
+test('pruneStaleSessions: negative maxIdleMinutes throws', async () => {
+  await assert.rejects(() => pruneStaleSessions({ maxIdleMinutes: -5 }), /finite positive number/);
+});
+
+test('pruneStaleSessions: zero maxIdleMinutes throws', async () => {
+  await assert.rejects(() => pruneStaleSessions({ maxIdleMinutes: 0 }), /finite positive number/);
+});
