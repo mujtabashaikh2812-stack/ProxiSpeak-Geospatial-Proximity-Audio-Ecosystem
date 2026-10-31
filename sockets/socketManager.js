@@ -14,6 +14,7 @@ const {
 const { defaultThrottle } = require('../services/throttleEngine');
 const { SocketClusterAdapter } = require('../services/socketClusterAdapter');
 const { defaultMeshManager } = require('../services/meshManager');
+const { defaultSpatialCache } = require('../services/spatialCache');
 
 /**
  * In-memory active user registry
@@ -92,7 +93,11 @@ function initSocketServer(httpServer, options = {}) {
         ? clusterAdapter.getAllClusterUsers().filter((u) => u.userId !== userData.userId)
         : allOtherUsers;
 
-      const nearbyPeers = getNearbyPeersForUser(userData, allClusterPeers, EARSHOT_RADIUS);
+      let nearbyPeers = defaultSpatialCache.getCachedNearbyPeers(userData);
+      if (!nearbyPeers) {
+        nearbyPeers = getNearbyPeersForUser(userData, allClusterPeers, EARSHOT_RADIUS);
+        defaultSpatialCache.setCachedNearbyPeers(userData, nearbyPeers);
+      }
       const meshAlloc = defaultMeshManager.evaluateMeshAllocation(userData, nearbyPeers);
 
       // Send initial room layout & state to joining user
@@ -222,8 +227,13 @@ function initSocketServer(httpServer, options = {}) {
         const transitions = evaluateProximityOnMove(user, allUsers, EARSHOT_RADIUS);
         dispatchProximityTransitions(io, transitions);
 
-        // 3. Dynamic WebRTC Mesh Connection Capping & Priority Allocation
-        const nearbyPeers = getNearbyPeersForUser(user, allUsers, EARSHOT_RADIUS);
+        // 3. Dynamic WebRTC Mesh Connection Capping & Priority Allocation (with Spatial Caching)
+        let nearbyPeers = defaultSpatialCache.getCachedNearbyPeers(user);
+        if (!nearbyPeers) {
+          nearbyPeers = getNearbyPeersForUser(user, allUsers, EARSHOT_RADIUS);
+          defaultSpatialCache.setCachedNearbyPeers(user, nearbyPeers);
+        }
+
         const meshAlloc = defaultMeshManager.evaluateMeshAllocation(user, nearbyPeers);
         if (meshAlloc.isCapped || meshAlloc.promoted.length > 0 || meshAlloc.demoted.length > 0) {
           socket.emit('mesh:update', {
@@ -245,6 +255,7 @@ function initSocketServer(httpServer, options = {}) {
         userToSocket.delete(user.userId);
         defaultThrottle.cleanupPlayer(user.userId);
         defaultMeshManager.cleanupUser(user.userId);
+        defaultSpatialCache.invalidateUser(user.userId);
 
         const remainingUsers = Array.from(activeUsers.values());
 
@@ -345,6 +356,7 @@ module.exports = {
   getSocketByUserId,
   getClusterAdapter,
   defaultMeshManager,
+  defaultSpatialCache,
   activeUsers,
   userToSocket,
 };

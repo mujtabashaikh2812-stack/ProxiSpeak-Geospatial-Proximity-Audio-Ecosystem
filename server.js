@@ -15,6 +15,7 @@ const {
 const { defaultThrottle } = require('./services/throttleEngine');
 const { checkRedisHealth } = require('./services/redisClient');
 const { defaultMeshManager } = require('./services/meshManager');
+const { defaultSpatialCache } = require('./services/spatialCache');
 
 const app = express();
 const server = http.createServer(app);
@@ -141,6 +142,11 @@ app.get('/api/performance/throttle', (req, res) => {
 // WebRTC Mesh capping & connection allocation performance diagnostics (Week 3 Scaling)
 app.get('/api/performance/mesh', (req, res) => {
   res.status(200).json(defaultMeshManager.getStats());
+});
+
+// Spatial coordinate & proximity cache performance diagnostics (Week 3 Scaling)
+app.get('/api/performance/cache', (req, res) => {
+  res.status(200).json(defaultSpatialCache.getStats());
 });
 
 if (require.main === module) {
