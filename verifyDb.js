@@ -6,6 +6,8 @@ const { runSeed } = require('./seed');
 const { findUsersNearCanvasPoint } = require('./proximityService');
 const { canvasToGeoJSON } = require('./canvasToGeo');
 const { pruneStaleSessions } = require('./sessionPruner');
+const { seedZones } = require('./scripts/seedZones');
+const { OfficeZone, zoneContainsCanvasPoint } = require('./models/OfficeZone');
 
 const QUERY_CENTRE_X = 500;
 const QUERY_CENTRE_Y = 500;
@@ -207,9 +209,35 @@ const seedResult1 = await runSeed();
       'dryStale=' + dry.staleCount + ' dryDeleted=' + dry.deletedCount + ' realDeleted=' + real.deletedCount + ' remaining=' + remaining);
     await User.deleteMany({ userId: /^prune:test:/ });
 
-    // ---- Check 8: cleanup ----
+    // ---- Check 8: office zone seeder writes 3 and is idempotent ----
+    const brokenRing = [[[0, 0], [10, 0], [10, 10]]]; // unclosed
+    const brokenZone = new OfficeZone({
+      zoneId: 'broken-zone',
+      name: 'Broken',
+      type: 'enclosed_room',
+      boundary: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] },
+      canvasBoundary: brokenRing,
+    });
+    const brokenErr = brokenZone.validateSync();
+    const brokenOk = !!brokenErr && !!brokenErr.errors.canvasBoundary;
+
+    await seedZones({ confirmSeed: true });
+    const count1 = await OfficeZone.countDocuments();
+    await seedZones({ confirmSeed: true });
+    const count2 = await OfficeZone.countDocuments();
+    const alpha = await OfficeZone.findOne({ zoneId: 'conference-alpha' }).lean();
+    const inside = zoneContainsCanvasPoint(alpha, 100, 100);
+    const outside = zoneContainsCanvasPoint(alpha, 500, 500);
+    const idx = await OfficeZone.collection.indexes();
+    const hasBoundary = idx.some((i) => i.key && i.key.boundary === '2dsphere');
+    const check9Ok = brokenOk && count1 === 3 && count2 === 3 && inside === true && outside === false && hasBoundary;
+    record('Check 8: office zone seeder writes 3, idempotent, containment and index verified', check9Ok,
+      'brokenRejected=' + brokenOk + ' count1=' + count1 + ' count2=' + count2 + ' inside=' + inside + ' outside=' + outside + ' hasBoundary2dsphere=' + hasBoundary);
+    await OfficeZone.deleteMany({});
+
+    // ---- Check 9: cleanup ----
     await mongoose.connection.dropDatabase();
-    record('Check 8: test database dropped and memory server stopped', true, 'dropped');
+    record('Check 9: test database dropped and memory server stopped', true, 'dropped');
 
   } finally {
     if (mongoose.connection.readyState === 1) {

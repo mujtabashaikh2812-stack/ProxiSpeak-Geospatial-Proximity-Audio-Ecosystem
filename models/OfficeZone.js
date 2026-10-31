@@ -88,6 +88,52 @@ const OfficeZoneSchema = new mongoose.Schema(
     // holds raw canvas pixels for audit and containment checks; never indexed
     canvasBoundary: {
       type: [[[Number]]],
+      validate: {
+        validator(value) {
+          if (value === undefined || value === null) return true; // optional
+          if (Array.isArray(value) && value.length === 0) return true; // optional empty
+          if (!Array.isArray(value) || value.length === 0) return false;
+          for (const ring of value) {
+            if (!Array.isArray(ring) || ring.length < 4) return false;
+            const first = ring[0];
+            const last = ring[ring.length - 1];
+            if (!Array.isArray(first) || first.length !== 2) return false;
+            if (!Array.isArray(last) || last.length !== 2) return false;
+            if (first[0] !== last[0] || first[1] !== last[1]) return false;
+            for (const pos of ring) {
+              if (!Array.isArray(pos) || pos.length !== 2) return false;
+              const [x, y] = pos;
+              if (typeof x !== 'number' || !Number.isFinite(x)) return false;
+              if (typeof y !== 'number' || !Number.isFinite(y)) return false;
+              if (Math.abs(x) > 100000 || Math.abs(y) > 100000) return false;
+            }
+          }
+          return true;
+        },
+        message(props) {
+          const v = props.value;
+          if (v === undefined || v === null) return 'canvasBoundary is optional';
+          if (!Array.isArray(v) || v.length === 0) return 'canvasBoundary must contain at least one ring';
+          for (const ring of v) {
+            if (!Array.isArray(ring) || ring.length < 4) return 'each canvas ring must have at least four positions';
+            const first = ring[0];
+            const last = ring[ring.length - 1];
+            if (!Array.isArray(first) || first.length !== 2 || !Array.isArray(last) || last.length !== 2) {
+              return 'each canvas position must be a [x, y] pair';
+            }
+            if (first[0] !== last[0] || first[1] !== last[1]) return 'canvas ring must be closed (first and last position identical)';
+            for (const pos of ring) {
+              if (!Array.isArray(pos) || pos.length !== 2) return 'each canvas position must be a [x, y] pair';
+              const [x, y] = pos;
+              if (typeof x !== 'number' || !Number.isFinite(x) || typeof y !== 'number' || !Number.isFinite(y)) {
+                return 'all canvas coordinates must be finite numbers';
+              }
+              if (Math.abs(x) > 100000 || Math.abs(y) > 100000) return 'canvas coordinates must be within MAX_CANVAS_COORD';
+            }
+          }
+          return 'invalid canvasBoundary';
+        },
+      },
     },
   },
   { strict: true, timestamps: true }

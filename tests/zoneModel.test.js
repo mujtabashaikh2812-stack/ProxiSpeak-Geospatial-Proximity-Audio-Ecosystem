@@ -125,9 +125,20 @@ test('canvasRingToGeoRing: closes open ring, preserves order, converts known pix
   assert.deepStrictEqual(last, first);
 });
 
-test('zoneContainsCanvasPoint: inside true, outside false', () => {
-  const ring = canvasRingToGeoRing([[[0, 0], [100, 0], [100, 100], [0, 100]]]);
-  const zone = { boundary: { type: 'Polygon', coordinates: ring } };
-  assert.strictEqual(zoneContainsCanvasPoint(zone, 50, 50), true);
-  assert.strictEqual(zoneContainsCanvasPoint(zone, 200, 200), false);
+test('OfficeZone: canvasBoundary accepts valid closed pixel ring', () => {
+  const z = makeZone({ canvasBoundary: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]] });
+  assert.strictEqual(z.validateSync(), undefined);
+});
+
+test('OfficeZone: canvasBoundary rejects unclosed ring', () => {
+  const z = makeZone({ canvasBoundary: [[[0, 0], [10, 0], [10, 10], [0, 10]]] });
+  const err = z.validateSync();
+  assert.ok(err);
+  assert.ok(err.errors.canvasBoundary);
+});
+
+test('OfficeZone: canvasBoundary rejects non-finite number', () => {
+  const z = makeZone({ canvasBoundary: [[[0, 0], [10, 0], [10, NaN], [0, 10], [0, 0]]] });
+  const err = z.validateSync();
+  assert.ok(err);
 });

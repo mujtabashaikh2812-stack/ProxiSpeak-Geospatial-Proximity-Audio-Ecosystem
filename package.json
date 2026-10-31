@@ -9,7 +9,8 @@
     "seed": "node seed.js",
     "demo": "node queryDemo.js",
     "benchmark": "node benchmark.js",
-    "verify:db": "node verifyDb.js"
+    "verify:db": "node verifyDb.js",
+    "seed:zones": "node scripts/seedZones.js"
   },
   "repository": {
     "type": "git",

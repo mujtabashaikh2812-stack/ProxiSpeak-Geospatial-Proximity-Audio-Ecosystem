@@ -199,3 +199,8 @@ package.json declares ISC. README badge shows MIT. This mismatch is reported
 -------------------
 
 pruneStaleSessions in sessionPruner.js finds users whose lastSeenAt is older than the cut-off (default 30 minutes) and either deletes them (dryRun false) or only reports them (dryRun true). dryRun defaults to true so nothing is deleted by accident. Run a real prune with: node -e "require('./sessionPruner').pruneStaleSessions({maxIdleMinutes:30,dryRun:false}).then(console.log)"
+
+12. Office zone seeding
+-----------------------
+
+seedZones in scripts/seedZones.js writes three zones (conference-alpha, stage-podium, open-workspace) as GeoJSON Polygon documents with a 2dsphere boundary index. It is an upsert matched on zoneId, so it is safe to re-run and never creates duplicates. It refuses to run without opt-in (SEED_DB=development or confirmSeed) and refuses a production URI. Run it with: npm run seed:zones
