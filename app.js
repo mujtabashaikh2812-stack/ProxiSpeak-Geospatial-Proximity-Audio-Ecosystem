@@ -32,6 +32,7 @@ const me = {
   speed: 4,
   zone: 'open',
   isOnStage: false,
+  facingAngle: 0, // Direction angle in radians (East by default)
 };
 
 // Office Zones
@@ -99,6 +100,7 @@ if (typeof io !== 'undefined') {
         displayName: me.name,
         canvasX: me.x,
         canvasY: me.y,
+        facingAngle: me.facingAngle,
       });
     });
 
@@ -114,6 +116,7 @@ if (typeof io !== 'undefined') {
             targetY: p.canvasY,
             color: '#a855f7',
             isOnStage: p.isOnStage,
+            facingAngle: p.facingAngle !== undefined ? p.facingAngle : 0,
           });
         });
       }
@@ -130,11 +133,15 @@ if (typeof io !== 'undefined') {
           targetX: data.canvasX,
           targetY: data.canvasY,
           color: '#a855f7',
+          facingAngle: data.facingAngle !== undefined ? data.facingAngle : 0,
         };
         peers.set(data.userId, p);
       } else {
         p.targetX = data.canvasX;
         p.targetY = data.canvasY;
+        if (data.facingAngle !== undefined) {
+          p.facingAngle = data.facingAngle;
+        }
       }
       p.isOnStage = data.isOnStage;
     });
@@ -157,6 +164,7 @@ if (!isLiveSocket) {
     targetX: 500,
     targetY: 390,
     color: '#2ecf7d',
+    facingAngle: -Math.PI / 2, // Facing North (at desk)
   });
   peers.set('p-2', {
     id: 'p-2',
@@ -167,6 +175,7 @@ if (!isLiveSocket) {
     targetY: 130,
     color: '#eab308',
     isOnStage: true,
+    facingAngle: Math.PI / 2, // Facing South (addressing crowd)
   });
   peers.set('p-3', {
     id: 'p-3',
@@ -176,6 +185,7 @@ if (!isLiveSocket) {
     targetX: 670,
     targetY: 400,
     color: '#ec4899',
+    facingAngle: -Math.PI / 2, // Facing North (at desk)
   });
 }
 
@@ -199,11 +209,13 @@ function movePlayer() {
   if (keys['d'] || keys['arrowright']) dx += me.speed;
 
   if (dx !== 0 || dy !== 0) {
+    // Track movement direction angle
+    me.facingAngle = Math.atan2(dy, dx);
     me.x = Math.max(30, Math.min(canvas.width - 30, me.x + dx));
     me.y = Math.max(30, Math.min(canvas.height - 30, me.y + dy));
 
     if (socket && isLiveSocket) {
-      socket.emit('player:move', { x: me.x, y: me.y });
+      socket.emit('player:move', { x: me.x, y: me.y, facingAngle: me.facingAngle });
     }
   }
 
@@ -262,6 +274,47 @@ function updateHUD() {
 }
 
 // Canvas Drawing Routines
+
+/**
+ * Renders directional gaze (two white pupil dots) and facing indicator (subtle pointer triangle)
+ * indicating whether the character is facing North, South, East, West, or diagonally.
+ */
+function drawFacingIndicator(x, y, radius, facingAngle) {
+  if (facingAngle === undefined || facingAngle === null) return;
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(facingAngle);
+
+  // 1. Subtle directional triangle pointer on the forward edge
+  ctx.beginPath();
+  ctx.moveTo(radius + 4, 0);       // Tip pointing forward
+  ctx.lineTo(radius - 2, -3.5);    // Base top point
+  ctx.lineTo(radius - 2, 3.5);     // Base bottom point
+  ctx.closePath();
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+
+  // 2. Two small white pupil dots indicating directional gaze
+  const eyeOffsetForward = radius * 0.45;
+  const eyeOffsetSpread = radius * 0.35;
+  const pupilRadius = 2.2;
+
+  ctx.fillStyle = '#ffffff';
+
+  // Left pupil dot
+  ctx.beginPath();
+  ctx.arc(eyeOffsetForward, -eyeOffsetSpread, pupilRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Right pupil dot
+  ctx.beginPath();
+  ctx.arc(eyeOffsetForward, eyeOffsetSpread, pupilRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
 function drawScene() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -344,6 +397,9 @@ function drawScene() {
     ctx.lineWidth = 2;
     ctx.stroke();
 
+    // Draw directional gaze & facing indicators
+    drawFacingIndicator(peer.x, peer.y, 14, peer.facingAngle);
+
     ctx.fillStyle = '#f8fafc';
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'center';
@@ -364,6 +420,9 @@ function drawScene() {
   ctx.lineWidth = 2.5;
   ctx.stroke();
 
+  // Draw directional gaze & facing indicators
+  drawFacingIndicator(me.x, me.y, me.radius, me.facingAngle);
+
   ctx.fillStyle = '#38bdf8';
   ctx.font = 'bold 12px sans-serif';
   ctx.textAlign = 'center';
@@ -374,8 +433,17 @@ function drawScene() {
 function animate() {
   movePlayer();
   peers.forEach((peer) => {
+    const prevX = peer.x;
+    const prevY = peer.y;
     peer.x += (peer.targetX - peer.x) * LERP_FACTOR;
     peer.y += (peer.targetY - peer.y) * LERP_FACTOR;
+
+    // Track peer movement direction for smooth facing indicator orientation
+    const peerDx = peer.x - prevX;
+    const peerDy = peer.y - prevY;
+    if (Math.hypot(peerDx, peerDy) > 0.05) {
+      peer.facingAngle = Math.atan2(peerDy, peerDx);
+    }
   });
   updateHUD();
   drawScene();
