@@ -8,6 +8,7 @@ const { canvasToGeoJSON } = require('./canvasToGeo');
 const { pruneStaleSessions } = require('./sessionPruner');
 const { seedZones } = require('./scripts/seedZones');
 const { OfficeZone, zoneContainsCanvasPoint } = require('./models/OfficeZone');
+const { listZones, createZone, findZonesContainingCanvasPoint } = require('./routes/zoneRoutes');
 
 const QUERY_CENTRE_X = 500;
 const QUERY_CENTRE_Y = 500;
@@ -235,9 +236,37 @@ const seedResult1 = await runSeed();
       'brokenRejected=' + brokenOk + ' count1=' + count1 + ' count2=' + count2 + ' inside=' + inside + ' outside=' + outside + ' hasBoundary2dsphere=' + hasBoundary);
     await OfficeZone.deleteMany({});
 
-    // ---- Check 9: cleanup ----
+    // ---- Check 9: zone route handlers ----
+    await OfficeZone.deleteMany({});
+    const created = await createZone({
+      zoneId: 'route-test-zone',
+      name: 'Route Test Zone',
+      type: 'enclosed_room',
+      canvasBoundary: [[[10, 10], [60, 10], [60, 60], [10, 60], [10, 10]]],
+    });
+    const createOk = created.status === 201;
+    const listed = await listZones({});
+    const listOk = listed.status === 200 && listed.body.count === 1;
+    const insideRoute = await findZonesContainingCanvasPoint(30, 30);
+    const outsideRoute = await findZonesContainingCanvasPoint(5000, 5000);
+    const containOk = insideRoute.status === 200 && insideRoute.body.count === 1 && outsideRoute.status === 200 && outsideRoute.body.count === 0;
+    const dup = await createZone({
+      zoneId: 'route-test-zone',
+      name: 'Dup',
+      type: 'enclosed_room',
+      canvasBoundary: [[[10, 10], [60, 10], [60, 60], [10, 60], [10, 10]]],
+    });
+    const dupOk = dup.status === 409;
+    const bad = await createZone({ zoneId: '', name: 'Bad', type: 'enclosed_room' });
+    const badOk = bad.status === 400;
+    const routeOk = createOk && listOk && containOk && dupOk && badOk;
+    record('Check 9: zone route handlers create/list/contain/duplicate/malformed', routeOk,
+      'create=' + created.status + ' list=' + listed.status + '/' + listed.body.count + ' inside=' + insideRoute.body.count + ' outside=' + outsideRoute.body.count + ' dup=' + dup.status + ' bad=' + bad.status);
+    await OfficeZone.deleteMany({});
+
+    // ---- Check 10: cleanup ----
     await mongoose.connection.dropDatabase();
-    record('Check 9: test database dropped and memory server stopped', true, 'dropped');
+    record('Check 10: test database dropped and memory server stopped', true, 'dropped');
 
   } finally {
     if (mongoose.connection.readyState === 1) {

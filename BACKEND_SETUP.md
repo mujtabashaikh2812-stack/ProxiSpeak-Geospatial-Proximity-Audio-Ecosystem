@@ -203,4 +203,9 @@ pruneStaleSessions in sessionPruner.js finds users whose lastSeenAt is older tha
 12. Office zone seeding
 -----------------------
 
-seedZones in scripts/seedZones.js writes three zones (conference-alpha, stage-podium, open-workspace) as GeoJSON Polygon documents with a 2dsphere boundary index. It is an upsert matched on zoneId, so it is safe to re-run and never creates duplicates. It refuses to run without opt-in (SEED_DB=development or confirmSeed) and refuses a production URI. Run it with: npm run seed:zones
+13. Zone API handlers
+---------------------
+
+Exported functions: listZones, createZone, findZonesContainingCanvasPoint, registerZoneRoutes.
+Routes: GET /api/db/zones and POST /api/db/zones.
+Request and response: listZones returns { count, zones }; createZone accepts zoneId, name, type, isSoundproof, isSpotlightBroadcast, isActive, and either canvasBoundary in pixels or boundary in GeoJSON, and returns { zone } with status 201. Bad input returns 400 with an error naming the offending field; a duplicate zoneId returns 409. findZonesContainingCanvasPoint performs a real $geoIntersects query then confirms candidates in pixels. express is intentionally not a dependency here; the lead mounts these handlers on his own server.
