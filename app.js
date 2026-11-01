@@ -20,6 +20,7 @@ const spotlightAlert = document.getElementById('spotlightAlert');
 // Proximity & Spatial constants
 const EARSHOT_RADIUS = 100; // px
 const LERP_FACTOR = 0.2;
+const VOICE_THRESHOLD = 0.15; // Threshold for audio volume / speech activity
 
 // Local Player State
 const me = {
@@ -33,6 +34,7 @@ const me = {
   zone: 'open',
   isOnStage: false,
   facingAngle: 0, // Direction angle in radians (East by default)
+  isSpeaking: false,
 };
 
 // Office Zones
@@ -101,6 +103,7 @@ if (typeof io !== 'undefined') {
         canvasX: me.x,
         canvasY: me.y,
         facingAngle: me.facingAngle,
+        isSpeaking: me.isSpeaking,
       });
     });
 
@@ -114,9 +117,11 @@ if (typeof io !== 'undefined') {
             y: p.canvasY,
             targetX: p.canvasX,
             targetY: p.canvasY,
+            radius: 14,
             color: '#a855f7',
             isOnStage: p.isOnStage,
             facingAngle: p.facingAngle !== undefined ? p.facingAngle : 0,
+            isSpeaking: !!p.isSpeaking,
           });
         });
       }
@@ -132,8 +137,10 @@ if (typeof io !== 'undefined') {
           y: data.canvasY,
           targetX: data.canvasX,
           targetY: data.canvasY,
+          radius: 14,
           color: '#a855f7',
           facingAngle: data.facingAngle !== undefined ? data.facingAngle : 0,
+          isSpeaking: !!data.isSpeaking,
         };
         peers.set(data.userId, p);
       } else {
@@ -142,8 +149,18 @@ if (typeof io !== 'undefined') {
         if (data.facingAngle !== undefined) {
           p.facingAngle = data.facingAngle;
         }
+        if (data.isSpeaking !== undefined) {
+          p.isSpeaking = !!data.isSpeaking;
+        }
       }
       p.isOnStage = data.isOnStage;
+    });
+
+    socket.on('player:speaking', (data) => {
+      const p = peers.get(data.userId);
+      if (p) {
+        p.isSpeaking = !!data.isSpeaking;
+      }
     });
 
     socket.on('user:left', (data) => {
@@ -163,8 +180,10 @@ if (!isLiveSocket) {
     y: 390,
     targetX: 500,
     targetY: 390,
+    radius: 14,
     color: '#2ecf7d',
     facingAngle: -Math.PI / 2, // Facing North (at desk)
+    isSpeaking: false,
   });
   peers.set('p-2', {
     id: 'p-2',
@@ -173,9 +192,11 @@ if (!isLiveSocket) {
     y: 130,
     targetX: 740,
     targetY: 130,
+    radius: 14,
     color: '#eab308',
     isOnStage: true,
     facingAngle: Math.PI / 2, // Facing South (addressing crowd)
+    isSpeaking: true, // Lead speaker on stage
   });
   peers.set('p-3', {
     id: 'p-3',
@@ -184,20 +205,44 @@ if (!isLiveSocket) {
     y: 400,
     targetX: 670,
     targetY: 400,
+    radius: 14,
     color: '#ec4899',
     facingAngle: -Math.PI / 2, // Facing North (at desk)
+    isSpeaking: false,
   });
 }
 
-// Keyboard Input Handler
+// Keyboard Input Handler (Movement + Push-to-Talk via Space or V)
 const keys = {};
 document.addEventListener('keydown', (e) => {
   keys[e.key.toLowerCase()] = true;
   keys[e.key] = true;
+
+  // Push-to-talk voice activity activation
+  if (e.code === 'Space' || e.key.toLowerCase() === 'v') {
+    e.preventDefault();
+    if (!me.isSpeaking) {
+      me.isSpeaking = true;
+      if (socket && isLiveSocket) {
+        socket.emit('player:speaking', { userId: me.id, isSpeaking: true });
+      }
+    }
+  }
 });
+
 document.addEventListener('keyup', (e) => {
   keys[e.key.toLowerCase()] = false;
   keys[e.key] = false;
+
+  // Release push-to-talk voice activity
+  if (e.code === 'Space' || e.key.toLowerCase() === 'v') {
+    if (me.isSpeaking) {
+      me.isSpeaking = false;
+      if (socket && isLiveSocket) {
+        socket.emit('player:speaking', { userId: me.id, isSpeaking: false });
+      }
+    }
+  }
 });
 
 function movePlayer() {
@@ -243,6 +288,10 @@ function updateHUD() {
     statusText.textContent = '👂 Proximity Audio (≤ 100px)';
   }
 
+  if (me.isSpeaking) {
+    statusText.textContent += ' • 🎙️ Mic Transmitting';
+  }
+
   spotlightAlert.style.display = me.isOnStage ? 'block' : 'none';
 
   // Render User List Sidebar
@@ -267,6 +316,10 @@ function updateHUD() {
       tag = `<span class="tag-inaudible">🔇 Silent (${d}px)</span>`;
     }
 
+    if (peer.isSpeaking) {
+      tag += ' <span class="tag-speaking">🎙️ Speaking</span>';
+    }
+
     listHtml += `<li><span>${peer.name}</span> ${tag}</li>`;
   });
 
@@ -274,6 +327,41 @@ function updateHUD() {
 }
 
 // Canvas Drawing Routines
+
+/**
+ * Voice Activity Ripple Animation
+ * If a peer or the local user is speaking (isSpeaking === true or volume > threshold):
+ * Draw 2 concentric pulsing green rings expanding outward from the avatar radius:
+ * ctx.strokeStyle = `rgba(34, 197, 94, ${1 - rippleProgress})`;
+ * ctx.lineWidth = 2;
+ * ctx.beginPath();
+ * ctx.arc(p.x, p.y, p.radius + rippleProgress * 15, 0, Math.PI * 2);
+ * ctx.stroke();
+ * Visually communicates who is speaking without glancing at a text HUD.
+ */
+function drawVoiceActivityRipples(p, timestamp) {
+  if (!p) return;
+  const isSpeaking = p.isSpeaking === true || (p.volume !== undefined && p.volume > VOICE_THRESHOLD);
+  if (!isSpeaking) return;
+
+  const radius = p.radius || 14;
+  const cycleDuration = 1000; // 1 second pulse cycle
+  const numRings = 2;
+
+  for (let i = 0; i < numRings; i++) {
+    // 2 concentric pulsing rings offset by half-cycle (0.5)
+    const phaseOffset = i / numRings;
+    const rippleProgress = ((timestamp / cycleDuration) + phaseOffset) % 1;
+
+    ctx.save();
+    ctx.strokeStyle = `rgba(34, 197, 94, ${1 - rippleProgress})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, radius + rippleProgress * 15, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
 
 /**
  * Renders directional gaze (two white pupil dots) and facing indicator (subtle pointer triangle)
@@ -315,7 +403,7 @@ function drawFacingIndicator(x, y, radius, facingAngle) {
   ctx.restore();
 }
 
-function drawScene() {
+function drawScene(timestamp = 0) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // 1. Office Grid Background
@@ -389,8 +477,11 @@ function drawScene() {
 
   // 6. Draw Remote Peers
   peers.forEach((peer) => {
+    // Draw 2 concentric pulsing green rings if peer is speaking
+    drawVoiceActivityRipples(peer, timestamp);
+
     ctx.beginPath();
-    ctx.arc(peer.x, peer.y, 14, 0, Math.PI * 2);
+    ctx.arc(peer.x, peer.y, peer.radius || 14, 0, Math.PI * 2);
     ctx.fillStyle = peer.isOnStage ? '#eab308' : peer.color;
     ctx.fill();
     ctx.strokeStyle = '#ffffff';
@@ -398,7 +489,7 @@ function drawScene() {
     ctx.stroke();
 
     // Draw directional gaze & facing indicators
-    drawFacingIndicator(peer.x, peer.y, 14, peer.facingAngle);
+    drawFacingIndicator(peer.x, peer.y, peer.radius || 14, peer.facingAngle);
 
     ctx.fillStyle = '#f8fafc';
     ctx.font = '11px sans-serif';
@@ -412,6 +503,9 @@ function drawScene() {
   });
 
   // 7. Draw Local Avatar
+  // Draw 2 concentric pulsing green rings if local user is speaking
+  drawVoiceActivityRipples(me, timestamp);
+
   ctx.beginPath();
   ctx.arc(me.x, me.y, me.radius, 0, Math.PI * 2);
   ctx.fillStyle = me.isOnStage ? '#eab308' : me.color;
@@ -430,7 +524,7 @@ function drawScene() {
 }
 
 // 60 FPS Render Loop
-function animate() {
+function animate(timestamp = 0) {
   movePlayer();
   peers.forEach((peer) => {
     const prevX = peer.x;
@@ -445,9 +539,19 @@ function animate() {
       peer.facingAngle = Math.atan2(peerDy, peerDx);
     }
   });
+
+  // Natural speaking cadence simulation for mock stage speaker (Nikhil)
+  if (!isLiveSocket) {
+    const nikhil = peers.get('p-2');
+    if (nikhil) {
+      // Natural speech cadence: speaking for 2.4s, brief 0.8s pause between phrases
+      nikhil.isSpeaking = (timestamp % 3200) < 2400;
+    }
+  }
+
   updateHUD();
-  drawScene();
+  drawScene(timestamp);
   requestAnimationFrame(animate);
 }
 
-animate();
+requestAnimationFrame(animate);
