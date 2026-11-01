@@ -16,6 +16,7 @@ const { defaultThrottle } = require('./services/throttleEngine');
 const { checkRedisHealth } = require('./services/redisClient');
 const { defaultMeshManager } = require('./services/meshManager');
 const { defaultSpatialCache } = require('./services/spatialCache');
+const { defaultOcclusionEngine } = require('./services/occlusionEngine');
 
 const app = express();
 const server = http.createServer(app);
@@ -147,6 +148,19 @@ app.get('/api/performance/mesh', (req, res) => {
 // Spatial coordinate & proximity cache performance diagnostics (Week 3 Scaling)
 app.get('/api/performance/cache', (req, res) => {
   res.status(200).json(defaultSpatialCache.getStats());
+});
+
+// Physics-aware acoustic raycasting & wall occlusion diagnostics (Week 4 Physics)
+app.get('/api/performance/occlusion', (req, res) => {
+  res.status(200).json(defaultOcclusionEngine.getStats());
+});
+
+// Office acoustic obstacles inspection endpoint
+app.get('/api/zones/obstacles', (req, res) => {
+  res.status(200).json({
+    count: defaultOcclusionEngine.getAllObstacles().length,
+    obstacles: defaultOcclusionEngine.getAllObstacles(),
+  });
 });
 
 if (require.main === module) {

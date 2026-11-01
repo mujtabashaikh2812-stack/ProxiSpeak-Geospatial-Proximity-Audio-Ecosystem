@@ -1,9 +1,11 @@
 'use strict';
 
+const { defaultOcclusionEngine } = require('./occlusionEngine');
+
 /**
  * Virtual Office Zone & Acoustic Boundary Manager
  * Handles enclosed meeting rooms, glass sound-barriers,
- * and the Spotlight Podium (Town Hall broadcast stage).
+ * acoustic raycasting wall occlusion, and the Spotlight Podium.
  */
 
 const OFFICE_ZONES = [
@@ -107,13 +109,51 @@ function evaluateAcousticRelation(userA, userB, distance, earshotRadius = 100) {
     };
   }
 
-  // 4. Default: Open Office Proximity
+  // 4. Default: Open Office Proximity (with Acoustic Raycasting Wall Occlusion)
   const inRange = distance <= earshotRadius;
+  if (!inRange) {
+    return {
+      canHear: false,
+      mode: 'proximity',
+      effectiveVolume: 0,
+      reason: 'Outside earshot radius',
+    };
+  }
+
+  const baseVolume = Math.max(0.1, 1 - distance / earshotRadius);
+
+  // Raycast between avatars if coordinates are available
+  if (
+    typeof userA.canvasX === 'number' &&
+    typeof userA.canvasY === 'number' &&
+    typeof userB.canvasX === 'number' &&
+    typeof userB.canvasY === 'number'
+  ) {
+    const ray = defaultOcclusionEngine.castSoundRay(
+      userA.canvasX,
+      userA.canvasY,
+      userB.canvasX,
+      userB.canvasY
+    );
+
+    if (ray.isOccluded) {
+      return {
+        canHear: true,
+        mode: 'occluded',
+        effectiveVolume: Math.round(baseVolume * ray.transmissionMultiplier * 1000) / 1000,
+        occlusionFactor: ray.occlusionFactor,
+        cutoffFrequencyHz: ray.cutoffFrequencyHz,
+        reason: `Acoustic wall occlusion via ${ray.intersectedObstacles.map((o) => o.name).join(', ')}`,
+      };
+    }
+  }
+
   return {
-    canHear: inRange,
+    canHear: true,
     mode: 'proximity',
-    effectiveVolume: inRange ? Math.max(0.1, 1 - distance / earshotRadius) : 0,
-    reason: inRange ? 'Within earshot radius' : 'Outside earshot radius',
+    effectiveVolume: baseVolume,
+    cutoffFrequencyHz: 20000,
+    reason: 'Within earshot radius with clear line-of-sight',
   };
 }
 
@@ -122,4 +162,5 @@ module.exports = {
   detectZone,
   isPointInBounds,
   evaluateAcousticRelation,
+  defaultOcclusionEngine,
 };
