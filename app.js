@@ -403,6 +403,103 @@ function drawFacingIndicator(x, y, radius, facingAngle) {
   ctx.restore();
 }
 
+/**
+ * Radar Minimap Overview HUD
+ * Renders a 140x90px translucent radar box in the bottom-left corner
+ * with scaled office bounds (scale factor ~0.12), miniature room rectangles,
+ * and colored player dots.
+ */
+function drawRadarMinimap() {
+  const mmW = 140;
+  const mmH = 90;
+  const margin = 14;
+  const mmX = margin;
+  const mmY = canvas.height - mmH - margin;
+  const scale = 0.12;
+
+  ctx.save();
+
+  // 1. Render 140x90px translucent radar box in bottom-left corner
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+  ctx.fillRect(mmX, mmY, mmW, mmH);
+
+  // Border & header
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(mmX, mmY, mmW, mmH);
+
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = 'bold 8.5px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('📡 RADAR OVERVIEW', mmX + 6, mmY + 11);
+
+  // Center the scaled office bounds inside the 140x90 radar box
+  const mapOffsetX = mmX + Math.round((mmW - canvas.width * scale) / 2);
+  const mapOffsetY = mmY + Math.round((mmH - canvas.height * scale) / 2) + 2;
+
+  // Mini office perimeter bounds
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(mapOffsetX, mapOffsetY, canvas.width * scale, canvas.height * scale);
+
+  // 2. Draw miniature Conference Room Alpha rectangle
+  const cr = ZONES.conferenceRoom;
+  ctx.fillStyle = 'rgba(2, 132, 199, 0.45)';
+  ctx.fillRect(mapOffsetX + cr.x * scale, mapOffsetY + cr.y * scale, cr.w * scale, cr.h * scale);
+  ctx.strokeStyle = '#0284c7';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(mapOffsetX + cr.x * scale, mapOffsetY + cr.y * scale, cr.w * scale, cr.h * scale);
+
+  // 3. Draw miniature Stage (Podium) rectangle
+  const pd = ZONES.podium;
+  ctx.fillStyle = 'rgba(202, 138, 4, 0.45)';
+  ctx.fillRect(mapOffsetX + pd.x * scale, mapOffsetY + pd.y * scale, pd.w * scale, pd.h * scale);
+  ctx.strokeStyle = '#ca8a04';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(mapOffsetX + pd.x * scale, mapOffsetY + pd.y * scale, pd.w * scale, pd.h * scale);
+
+  // 4. Draw miniature color dots for all connected teammates
+  peers.forEach((peer) => {
+    const px = mapOffsetX + peer.x * scale;
+    const py = mapOffsetY + peer.y * scale;
+
+    ctx.beginPath();
+    ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = peer.isOnStage ? '#eab308' : (peer.color || '#a855f7');
+    ctx.fill();
+
+    // Active speech ripple indicator on minimap
+    if (peer.isSpeaking) {
+      ctx.beginPath();
+      ctx.arc(px, py, 4.5, 0, Math.PI * 2);
+      ctx.strokeStyle = '#22c55e';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  });
+
+  // Local user avatar dot on minimap
+  const myX = mapOffsetX + me.x * scale;
+  const myY = mapOffsetY + me.y * scale;
+  ctx.beginPath();
+  ctx.arc(myX, myY, 3, 0, Math.PI * 2);
+  ctx.fillStyle = me.isOnStage ? '#eab308' : me.color;
+  ctx.fill();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  if (me.isSpeaking) {
+    ctx.beginPath();
+    ctx.arc(myX, myY, 5, 0, Math.PI * 2);
+    ctx.strokeStyle = '#22c55e';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
 function drawScene(timestamp = 0) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -521,6 +618,9 @@ function drawScene(timestamp = 0) {
   ctx.font = 'bold 12px sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText(me.name, me.x, me.y - 20);
+
+  // 8. Radar Minimap Overview HUD (bottom-left corner)
+  drawRadarMinimap();
 }
 
 // 60 FPS Render Loop
