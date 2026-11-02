@@ -9,6 +9,8 @@ const { pruneStaleSessions } = require('./sessionPruner');
 const { seedZones } = require('./scripts/seedZones');
 const { OfficeZone, zoneContainsCanvasPoint } = require('./models/OfficeZone');
 const { listZones, createZone, findZonesContainingCanvasPoint } = require('./routes/zoneRoutes');
+const sessionHistory = require('./sessionHistory');
+const { UserSession } = require('./models/UserSession');
 
 const QUERY_CENTRE_X = 500;
 const QUERY_CENTRE_Y = 500;
@@ -264,9 +266,24 @@ const seedResult1 = await runSeed();
       'create=' + created.status + ' list=' + listed.status + '/' + listed.body.count + ' inside=' + insideRoute.body.count + ' outside=' + outsideRoute.body.count + ' dup=' + dup.status + ' bad=' + bad.status);
     await OfficeZone.deleteMany({});
 
-    // ---- Check 10: cleanup ----
+    // ---- Check 10: session history occupancy and dwell time ----
+    await UserSession.deleteMany({});
+    const now = new Date();
+    await sessionHistory.openSession({ userId: 'sh1', zoneId: 'conference-alpha', enteredAt: new Date(now.getTime() - 60000) });
+    await sessionHistory.openSession({ userId: 'sh2', zoneId: 'conference-alpha', enteredAt: new Date(now.getTime() - 60000) });
+    await sessionHistory.openSession({ userId: 'sh3', zoneId: 'conference-alpha', enteredAt: new Date(now.getTime() - 60000) });
+    await sessionHistory.closeSession({ userId: 'sh3', exitedAt: now });
+    const occ = await sessionHistory.getZoneOccupancy('conference-alpha');
+    const dwell = await sessionHistory.getDwellTimeForUser('sh3');
+    const dupOpen = await sessionHistory.openSession({ userId: 'sh1', zoneId: 'conference-alpha', enteredAt: now });
+    const check11Ok = occ.body.occupancy === 2 && dwell.body.totalSeconds > 0 && dupOpen.status === 409;
+    record('Check 10: session history occupancy and dwell time', check11Ok,
+      'occupancy=' + occ.body.occupancy + ' dwellSeconds=' + dwell.body.totalSeconds + ' dupStatus=' + dupOpen.status);
+    await UserSession.deleteMany({});
+
+    // ---- Check 11: cleanup ----
     await mongoose.connection.dropDatabase();
-    record('Check 10: test database dropped and memory server stopped', true, 'dropped');
+    record('Check 11: test database dropped and memory server stopped', true, 'dropped');
 
   } finally {
     if (mongoose.connection.readyState === 1) {
