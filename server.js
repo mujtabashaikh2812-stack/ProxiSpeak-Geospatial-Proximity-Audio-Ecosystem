@@ -17,6 +17,7 @@ const { checkRedisHealth } = require('./services/redisClient');
 const { defaultMeshManager } = require('./services/meshManager');
 const { defaultSpatialCache } = require('./services/spatialCache');
 const { defaultOcclusionEngine } = require('./services/occlusionEngine');
+const { defaultIntegrationHarness } = require('./services/integrationHarness');
 
 const app = express();
 const server = http.createServer(app);
@@ -160,6 +161,19 @@ app.get('/api/zones/obstacles', (req, res) => {
   res.status(200).json({
     count: defaultOcclusionEngine.getAllObstacles().length,
     obstacles: defaultOcclusionEngine.getAllObstacles(),
+  });
+});
+
+// Multi-Pod full system integration health audit scorecard (Week 3–4 Milestone)
+app.get('/api/system/health-audit', async (req, res) => {
+  const scorecard = await defaultIntegrationHarness.runFullSystemAudit();
+  res.status(200).json(scorecard);
+});
+
+// Recent system health audit history
+app.get('/api/system/health-history', (req, res) => {
+  res.status(200).json({
+    history: defaultIntegrationHarness.auditHistory,
   });
 });
 
