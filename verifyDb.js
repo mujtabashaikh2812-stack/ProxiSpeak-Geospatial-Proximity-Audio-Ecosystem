@@ -276,7 +276,11 @@ const seedResult1 = await runSeed();
     const occ = await sessionHistory.getZoneOccupancy('conference-alpha');
     const dwell = await sessionHistory.getDwellTimeForUser('sh3');
     const dupOpen = await sessionHistory.openSession({ userId: 'sh1', zoneId: 'conference-alpha', enteredAt: now });
-    const check11Ok = occ.body.occupancy === 2 && dwell.body.totalSeconds > 0 && dupOpen.status === 409;
+    const entry = await UserSession.recordZoneEntry('sh1', 'conference-alpha');
+    const exit = await UserSession.recordZoneExit('sh1', 'conference-alpha');
+    const zvOk = Array.isArray(exit.body.session.zonesVisited) && exit.body.session.zonesVisited.length === 1 && exit.body.session.zonesVisited[0].enteredAt && exit.body.session.zonesVisited[0].leftAt;
+    const totalOk = typeof exit.body.session.totalDwellSeconds === 'number' && exit.body.session.totalDwellSeconds >= 0;
+    const check11Ok = occ.body.occupancy === 2 && dwell.body.totalSeconds > 0 && dupOpen.status === 409 && entry.status === 200 && exit.status === 200 && zvOk && totalOk;
     record('Check 10: session history occupancy and dwell time', check11Ok,
       'occupancy=' + occ.body.occupancy + ' dwellSeconds=' + dwell.body.totalSeconds + ' dupStatus=' + dupOpen.status);
     await UserSession.deleteMany({});

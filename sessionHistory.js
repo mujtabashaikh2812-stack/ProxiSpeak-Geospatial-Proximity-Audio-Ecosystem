@@ -31,6 +31,8 @@ async function openSession({ userId, zoneId, enteredAt, positionX, positionY } =
     userId: userId.trim(),
     zoneId: zoneId.trim().toLowerCase(),
     enteredAt: entered,
+    joinedAt: entered,
+    totalDwellSeconds: 0,
     lastPositionX: positionX,
     lastPositionY: positionY,
   });
@@ -46,7 +48,14 @@ async function closeSession({ userId, exitedAt } = {}) {
   if (Number.isNaN(exited.getTime())) return { status: 400, body: { error: 'exitedAt must be a valid date', field: 'exitedAt' } };
   if (exited < session.enteredAt) return { status: 400, body: { error: 'exitedAt must be >= enteredAt', field: 'exitedAt' } };
   session.exitedAt = exited;
+  session.leftAt = exited;
   session.dwellSeconds = Math.floor((exited.getTime() - session.enteredAt.getTime()) / 1000);
+  session.totalDwellSeconds = session.dwellSeconds;
+  if (Array.isArray(session.zonesVisited)) {
+    for (const zv of session.zonesVisited) {
+      if (zv.leftAt === null) zv.leftAt = exited;
+    }
+  }
   await session.save();
   return { status: 200, body: { session: session.toObject ? session.toObject() : session } };
 }

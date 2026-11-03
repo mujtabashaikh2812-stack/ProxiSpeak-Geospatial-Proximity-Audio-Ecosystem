@@ -79,3 +79,5 @@ Indexes: sessionId unique; compound zoneId asc + enteredAt desc; compound userId
 zoneId is a stable string identifier rather than an ObjectId reference so a zone can be re-seeded or renamed without orphaning history.
 
 Functions: openSession, closeSession, getZoneOccupancy, getDwellTimeForUser, getDwellTimeByZone.
+
+Session history sheet fields: socketId, joinedAt, leftAt, totalDwellSeconds, zonesVisited. Helpers: recordZoneEntry(userId, zoneId), recordZoneExit(userId, zoneId). joinedAt and leftAt mirror enteredAt and exitedAt and are kept in sync by sessionHistory.js.

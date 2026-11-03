@@ -114,16 +114,58 @@ test('getDwellTimeByZone orders by totalSeconds desc', async (t) => {
   assert.equal(r.body.zones[0].zoneId, 'stage-podium');
 });
 
-test('partial unique index blocks two open sessions at db level', async (t) => {
+test('recordZoneEntry adds one zonesVisited entry and sets joinedAt', async (t) => {
   if (skip(t)) return;
   await UserSession.deleteMany({});
-  await UserSession.init();
-  await UserSession.create({ sessionId: 's1', userId: 'dupuser', zoneId: 'conference-alpha', enteredAt: new Date() });
-  let thrown = false;
-  try {
-    await UserSession.create({ sessionId: 's2', userId: 'dupuser', zoneId: 'conference-alpha', enteredAt: new Date() });
-  } catch (e) {
-    thrown = true;
-  }
-  assert.ok(thrown);
+  await sessionHistory.openSession({ userId: 'r1', zoneId: 'conference-alpha', enteredAt: new Date() });
+  const r = await UserSession.recordZoneEntry('r1', 'conference-alpha');
+  assert.equal(r.status, 200);
+  assert.equal(r.body.session.zonesVisited.length, 1);
+  assert.ok(r.body.session.joinedAt);
+});
+
+test('recordZoneEntry repeat open zone returns 409', async (t) => {
+  if (skip(t)) return;
+  const r = await UserSession.recordZoneEntry('r1', 'conference-alpha');
+  assert.equal(r.status, 409);
+});
+
+test('recordZoneEntry with no open session returns 404', async (t) => {
+  if (skip(t)) return;
+  const r = await UserSession.recordZoneEntry('ghost', 'conference-alpha');
+  assert.equal(r.status, 404);
+});
+
+test('recordZoneExit sets leftAt and increases totalDwellSeconds', async (t) => {
+  if (skip(t)) return;
+  await new Promise((r) => setTimeout(r, 1100));
+  const r = await UserSession.recordZoneExit('r1', 'conference-alpha');
+  assert.equal(r.status, 200);
+  const zv = r.body.session.zonesVisited[0];
+  assert.ok(zv.leftAt);
+  assert.ok(r.body.session.totalDwellSeconds >= 0);
+});
+
+test('recordZoneExit for zone never entered returns 404', async (t) => {
+  if (skip(t)) return;
+  await UserSession.deleteMany({});
+  await sessionHistory.openSession({ userId: 'r2', zoneId: 'conference-alpha', enteredAt: new Date() });
+  const r = await UserSession.recordZoneExit('r2', 'stage-podium');
+  assert.equal(r.status, 404);
+});
+
+test('closeSession sets leftAt and totalDwellSeconds', async (t) => {
+  if (skip(t)) return;
+  await UserSession.deleteMany({});
+  await sessionHistory.openSession({ userId: 'r3', zoneId: 'conference-alpha', enteredAt: new Date('2026-01-01T00:00:00Z') });
+  const r = await sessionHistory.closeSession({ userId: 'r3', exitedAt: new Date('2026-01-01T00:00:10Z') });
+  assert.equal(r.status, 200);
+  assert.ok(r.body.session.leftAt);
+  assert.equal(r.body.session.totalDwellSeconds, r.body.session.dwellSeconds);
+});
+
+test('recordZoneEntry blank userId returns error result', async (t) => {
+  if (skip(t)) return;
+  const r = await UserSession.recordZoneEntry('', 'conference-alpha');
+  assert.equal(r.status, 400);
 });
