@@ -209,8 +209,7 @@ pruneStaleSessions in sessionPruner.js finds users whose lastSeenAt is older tha
 Exported functions: listZones, createZone, findZonesContainingCanvasPoint, registerZoneRoutes.
 Routes: GET /api/db/zones and POST /api/db/zones.
 Request and response: listZones returns { count, zones }; createZone accepts zoneId, name, type, isSoundproof, isSpotlightBroadcast, isActive, and either canvasBoundary in pixels or boundary in GeoJSON, and returns { zone } with status 201. Bad input returns 400 with an error naming the offending field; a duplicate zoneId returns 409. findZonesContainingCanvasPoint performs a real $geoIntersects query then confirms candidates in pixels. express is intentionally not a dependency here; the lead mounts these handlers on his own server.
- 
- # #   S e s s i o n   h i s t o r y  
-  
- U s e r S e s s i o n   m o d e l   r e c o r d s   o n e   s t a y   i n   o n e   r o o m .   F u n c t i o n s :   o p e n S e s s i o n ,   c l o s e S e s s i o n ,   g e t Z o n e O c c u p a n c y ,   g e t D w e l l T i m e F o r U s e r ,   g e t D w e l l T i m e B y Z o n e .   O n e   o p e n   s e s s i o n   p e r   u s e r   a t   m o s t .   R u n   t e s t s   w i t h :   n o d e   - - t e s t   t e s t s / s e s s i o n H i s t o r y . t e s t . j s  
- 
+
+## Session history
+
+UserSession model records one stay in one room. Functions: openSession, closeSession, getZoneOccupancy, getDwellTimeForUser, getDwellTimeByZone. One open session per user at most. Run tests with: node --test tests/sessionHistory.test.js
