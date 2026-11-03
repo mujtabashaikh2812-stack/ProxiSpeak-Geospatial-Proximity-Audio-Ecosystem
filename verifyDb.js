@@ -11,6 +11,8 @@ const { OfficeZone, zoneContainsCanvasPoint } = require('./models/OfficeZone');
 const { listZones, createZone, findZonesContainingCanvasPoint } = require('./routes/zoneRoutes');
 const sessionHistory = require('./sessionHistory');
 const { UserSession } = require('./models/UserSession');
+const { findUsersNearCanvasPointCached } = require('./proximityService');
+const { createNearbyCacheBridge } = require('./services/nearbyCacheBridge');
 
 const QUERY_CENTRE_X = 500;
 const QUERY_CENTRE_Y = 500;
@@ -285,9 +287,31 @@ const seedResult1 = await runSeed();
       'occupancy=' + occ.body.occupancy + ' dwellSeconds=' + dwell.body.totalSeconds + ' dupStatus=' + dupOpen.status);
     await UserSession.deleteMany({});
 
-    // ---- Check 11: cleanup ----
+    // ---- Check 11: nearby cache bridge ----
+    const store = new Map();
+    const stub = {
+      get: (k) => (store.has(k) ? store.get(k) : null),
+      set: (k, v, ttl) => { store.set(k, v); stub.storeCount = (stub.storeCount || 0) + 1; },
+    };
+    stub.storeCount = 0;
+    stub.hitCount = 0;
+    const origGet = stub.get;
+    stub.get = (k) => { const v = origGet(k); if (v !== null && v !== undefined) stub.hitCount++; return v; };
+    const bridge = createNearbyCacheBridge({ cache: stub });
+    // seed one user nearby
+    await User.deleteMany({});
+    const [lon, lat] = canvasToGeoJSON(100, 100);
+    await User.create({ userId: 'cache-user', location: { type: 'Point', coordinates: [lon, lat] }, canvasX: 100, canvasY: 100 });
+    const r1 = await findUsersNearCanvasPointCached('u1', 100, 100, 100, { cache: stub });
+    const r2 = await findUsersNearCanvasPointCached('u1', 100, 100, 100, { cache: stub });
+    const cacheOk = r1.cachedSource === 'database' && r2.cachedSource === 'cache' && r1.users.length === 1 && r2.users.length === 1 && stub.storeCount === 1 && stub.hitCount === 1;
+    record('Check 11: nearby cache bridge two calls first db second cache', cacheOk,
+      'r1=' + r1.cachedSource + ' r2=' + r2.cachedSource + ' storeCount=' + stub.storeCount + ' hitCount=' + stub.hitCount);
+    await User.deleteMany({});
+
+    // ---- Check 12: cleanup ----
     await mongoose.connection.dropDatabase();
-    record('Check 11: test database dropped and memory server stopped', true, 'dropped');
+    record('Check 12: test database dropped and memory server stopped', true, 'dropped');
 
   } finally {
     if (mongoose.connection.readyState === 1) {

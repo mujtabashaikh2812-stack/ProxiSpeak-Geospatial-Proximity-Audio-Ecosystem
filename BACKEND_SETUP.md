@@ -215,3 +215,5 @@ Request and response: listZones returns { count, zones }; createZone accepts zon
 UserSession model records one stay in one room. Functions: openSession, closeSession, getZoneOccupancy, getDwellTimeForUser, getDwellTimeByZone. One open session per user at most. Run tests with: node --test tests/sessionHistory.test.js
 
 Session history sheet fields: socketId, joinedAt, leftAt, totalDwellSeconds, zonesVisited. Helpers: recordZoneEntry(userId, zoneId), recordZoneExit(userId, zoneId). joinedAt and leftAt mirror enteredAt and exitedAt and are kept in sync by sessionHistory.js.
+
+Nearby cache bridge: services/spatialCache.js belongs to the leader and is not duplicated. services/nearbyCacheBridge.js is the adapter. It is a no-op while his file is absent. After merge his cache is the only cache and the bridge activates against it with no further change.

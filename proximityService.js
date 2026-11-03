@@ -2,6 +2,7 @@
 
 const User = require('./User');
 const { canvasToGeoJSON, pixelsToMetres, isFiniteNumber } = require('./canvasToGeo');
+const { createNearbyCacheBridge } = require('./services/nearbyCacheBridge');
 
 // Candidate retrieval allowance in metres. This margin only widens the set of
 // candidates returned by the $near query so that no real neighbour is dropped
@@ -80,8 +81,21 @@ async function findUsersNearCanvasPoint(centreX, centreY, radiusPixels, options 
   return results;
 }
 
+
+async function findUsersNearCanvasPointCached(userId, canvasX, canvasY, radiusPixels, options = {}) {
+  const bridge = createNearbyCacheBridge({ cache: (options && options.cache) || null });
+  const cached = bridge.getCachedNearby(userId, canvasX, canvasY);
+  if (cached !== null && cached !== undefined) {
+    return { users: cached, cachedSource: 'cache' };
+  }
+  const users = await findUsersNearCanvasPoint(canvasX, canvasY, radiusPixels, options);
+  bridge.setCachedNearby(userId, users, canvasX, canvasY);
+  return { users, cachedSource: 'database' };
+}
+
 module.exports = {
   findUsersNearCanvasPoint,
+  findUsersNearCanvasPointCached,
   validateCentre,
   validateRadius,
   CANDIDATE_MARGIN_METRES,
