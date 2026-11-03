@@ -20,6 +20,8 @@ const OFFICE_ZONES = [
       labelColor: '#0369a1',
     },
     description: 'Enclosed meeting room. Sound is contained within walls.',
+    isSoundproof: true,
+    isSpotlightBroadcast: false,
   },
   {
     id: 'podium',
@@ -32,8 +34,77 @@ const OFFICE_ZONES = [
       labelColor: '#854d0e',
     },
     description: 'Broadcast stage. Stepping on the podium amplifies audio to all users in the office.',
+    isSoundproof: false,
+    isSpotlightBroadcast: true,
   },
 ];
+
+/**
+ * Dynamically updates active office zones from persistent layout storage
+ * @param {Array} newZones - Array of zone objects
+ */
+function updateOfficeZones(newZones) {
+  if (!Array.isArray(newZones) || newZones.length === 0) return false;
+  const mapped = newZones.map((z) => ({
+    id: z.zoneId || z.id,
+    name: z.name,
+    type: z.type,
+    bounds: z.bounds,
+    theme: z.theme || {
+      fill: 'rgba(224, 242, 254, 0.65)',
+      border: '#0284c7',
+      labelColor: '#0369a1',
+    },
+    description: z.description || '',
+    isSoundproof: Boolean(z.isSoundproof || z.type === 'enclosed_room' || z.type === 'quiet_lounge'),
+    isSpotlightBroadcast: Boolean(z.isSpotlightBroadcast || z.type === 'spotlight_stage'),
+  }));
+
+  OFFICE_ZONES.length = 0;
+  OFFICE_ZONES.push(...mapped);
+  return true;
+}
+
+/**
+ * Resets office zones back to the default presets
+ */
+function resetOfficeZones() {
+  OFFICE_ZONES.length = 0;
+  OFFICE_ZONES.push(
+    {
+      id: 'conf-a',
+      name: 'Conference Room Alpha',
+      type: 'enclosed_room',
+      bounds: { x: 60, y: 60, width: 280, height: 220 },
+      theme: {
+        fill: 'rgba(224, 242, 254, 0.65)',
+        border: '#0284c7',
+        labelColor: '#0369a1',
+      },
+      description: 'Enclosed meeting room. Sound is contained within walls.',
+      isSoundproof: true,
+      isSpotlightBroadcast: false,
+    },
+    {
+      id: 'podium',
+      name: 'Town Hall Stage & Podium',
+      type: 'spotlight_stage',
+      bounds: { x: 520, y: 80, width: 140, height: 110 },
+      theme: {
+        fill: 'rgba(254, 240, 138, 0.75)',
+        border: '#ca8a04',
+        labelColor: '#854d0e',
+      },
+      description: 'Broadcast stage. Stepping on the podium amplifies audio to all users in the office.',
+      isSoundproof: false,
+      isSpotlightBroadcast: true,
+    }
+  );
+}
+
+function getActiveZones() {
+  return [...OFFICE_ZONES];
+}
 
 /**
  * Checks if a 2D coordinate falls within a zone rectangle
@@ -76,18 +147,21 @@ function evaluateAcousticRelation(userA, userB, distance, earshotRadius = 100) {
   const zoneB = detectZone(userB.canvasX, userB.canvasY);
 
   // 1. Spotlight Podium Check (Broadcast to all)
-  if (zoneA.id === 'podium' || zoneB.id === 'podium') {
+  const isPodiumA = zoneA.id === 'podium' || zoneA.isSpotlightBroadcast;
+  const isPodiumB = zoneB.id === 'podium' || zoneB.isSpotlightBroadcast;
+  if (isPodiumA || isPodiumB) {
     return {
       canHear: true,
       mode: 'spotlight',
-      speakerOnStage: zoneA.id === 'podium' ? userA.userId : userB.userId,
+      speakerOnStage: isPodiumA ? userA.userId : userB.userId,
       effectiveVolume: 1.0,
       reason: 'Stage broadcast overrides proximity',
     };
   }
 
   // 2. Both peers in the same enclosed meeting room
-  if (zoneA.id === 'conf-a' && zoneB.id === 'conf-a') {
+  const isSameEnclosedRoom = (zoneA.id === zoneB.id) && (zoneA.id === 'conf-a' || zoneA.isSoundproof || zoneA.type === 'enclosed_room');
+  if (isSameEnclosedRoom) {
     return {
       canHear: true,
       mode: 'room',
@@ -98,9 +172,12 @@ function evaluateAcousticRelation(userA, userB, distance, earshotRadius = 100) {
   }
 
   // 3. Wall obstruction: One peer is inside the conference room, the other is outside
+  const aSoundproof = zoneA.id === 'conf-a' || zoneA.isSoundproof || zoneA.type === 'enclosed_room';
+  const bSoundproof = zoneB.id === 'conf-a' || zoneB.isSoundproof || zoneB.type === 'enclosed_room';
   if (
-    (zoneA.id === 'conf-a' && zoneB.id !== 'conf-a') ||
-    (zoneA.id !== 'conf-a' && zoneB.id === 'conf-a')
+    (aSoundproof && !bSoundproof) ||
+    (!aSoundproof && bSoundproof) ||
+    (aSoundproof && bSoundproof && zoneA.id !== zoneB.id)
   ) {
     return {
       canHear: false,
@@ -163,4 +240,7 @@ module.exports = {
   isPointInBounds,
   evaluateAcousticRelation,
   defaultOcclusionEngine,
+  updateOfficeZones,
+  resetOfficeZones,
+  getActiveZones,
 };

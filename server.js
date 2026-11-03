@@ -18,6 +18,7 @@ const { defaultMeshManager } = require('./services/meshManager');
 const { defaultSpatialCache } = require('./services/spatialCache');
 const { defaultOcclusionEngine } = require('./services/occlusionEngine');
 const { defaultIntegrationHarness } = require('./services/integrationHarness');
+const { defaultLayoutPersistence } = require('./services/layoutPersistence');
 
 const app = express();
 const server = http.createServer(app);
@@ -175,6 +176,53 @@ app.get('/api/system/health-history', (req, res) => {
   res.status(200).json({
     history: defaultIntegrationHarness.auditHistory,
   });
+});
+
+// Persistent office layout inspection endpoint (Week 4 Spatial Persistence)
+app.get('/api/layout/active', (req, res) => {
+  res.status(200).json({
+    layout: defaultLayoutPersistence.getActiveLayout(),
+    summary: defaultLayoutPersistence.getLayoutSummary(),
+  });
+});
+
+// Layout summary telemetry endpoint
+app.get('/api/layout/summary', (req, res) => {
+  res.status(200).json(defaultLayoutPersistence.getLayoutSummary());
+});
+
+// Update persistent active office layout
+app.put('/api/layout/active', async (req, res) => {
+  try {
+    const updated = await defaultLayoutPersistence.saveLayout(req.body);
+    res.status(200).json({
+      message: 'Layout successfully updated and synchronized with live engines',
+      layout: updated,
+      summary: defaultLayoutPersistence.getLayoutSummary(),
+    });
+  } catch (err) {
+    res.status(400).json({
+      error: 'Failed to update layout',
+      details: err.message,
+    });
+  }
+});
+
+// Reset office layout to factory default floorplan
+app.post('/api/layout/reset', async (req, res) => {
+  try {
+    const layout = await defaultLayoutPersistence.resetToDefaultLayout();
+    res.status(200).json({
+      message: 'Layout reset to factory default and synchronized with live engines',
+      layout,
+      summary: defaultLayoutPersistence.getLayoutSummary(),
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: 'Failed to reset layout',
+      details: err.message,
+    });
+  }
 });
 
 if (require.main === module) {

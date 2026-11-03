@@ -285,6 +285,25 @@ class OcclusionEngine {
   }
 
   /**
+   * Clears all registered obstacles
+   */
+  clearAllObstacles() {
+    this.obstacles.clear();
+  }
+
+  /**
+   * Replaces all obstacles with a new list
+   */
+  loadObstacles(obstaclesList) {
+    this.clearAllObstacles();
+    if (Array.isArray(obstaclesList)) {
+      for (const obs of obstaclesList) {
+        this.registerObstacle(obs);
+      }
+    }
+  }
+
+  /**
    * Resets all obstacles and telemetry
    */
   reset() {
