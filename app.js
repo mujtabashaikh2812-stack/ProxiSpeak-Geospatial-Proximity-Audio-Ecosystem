@@ -45,7 +45,7 @@ const ZONES = {
     y: 60,
     w: 280,
     h: 220,
-    fill: 'rgba(224, 242, 254, 0.35)',
+    fill: 'rgba(224, 242, 254, 0.45)',
     border: '#0284c7',
   },
   podium: {
@@ -59,10 +59,8 @@ const ZONES = {
   },
 };
 
-// Office Furniture Desks (preserving layout)
+// Open Workspace Furniture Desks (preserving layout)
 const DESKS = [
-  { x: 100, y: 110, w: 100, h: 60, label: 'Desk 1' },
-  { x: 220, y: 110, w: 100, h: 60, label: 'Desk 2' },
   { x: 440, y: 380, w: 120, h: 70, label: 'Team Pod A' },
   { x: 620, y: 380, w: 120, h: 70, label: 'Team Pod B' },
   { x: 800, y: 380, w: 120, h: 70, label: 'Team Pod C' },
@@ -276,8 +274,8 @@ function updateHUD() {
   // Update Zone Badge
   if (me.zone === 'conference') {
     zoneBadge.textContent = 'Conference Room Alpha';
-    zoneBadge.className = 'zone-badge badge-room';
-    statusText.textContent = '🔒 Room Audio (Soundproof)';
+    zoneBadge.className = 'zone-badge badge-room badge-private-meeting';
+    statusText.textContent = '🔒 PRIVATE MEETING IN PROGRESS';
   } else if (me.zone === 'podium') {
     zoneBadge.textContent = 'Town Hall Podium';
     zoneBadge.className = 'zone-badge badge-podium';
@@ -520,17 +518,146 @@ function drawScene(timestamp = 0) {
     ctx.stroke();
   }
 
-  // 2. Draw Conference Room Alpha
+  // 2. Draw Conference Room Alpha with Frosted Glass Aesthetic
   const cr = ZONES.conferenceRoom;
-  ctx.fillStyle = cr.fill;
+
+  // Base semi-transparent frosted cyan glass tint
+  ctx.fillStyle = 'rgba(224, 242, 254, 0.45)';
   ctx.fillRect(cr.x, cr.y, cr.w, cr.h);
+
+  // Frosted glass specular reflection sheen gradient
+  const glassSheen = ctx.createLinearGradient(cr.x, cr.y, cr.x + cr.w, cr.y + cr.h);
+  glassSheen.addColorStop(0, 'rgba(255, 255, 255, 0.22)');
+  glassSheen.addColorStop(0.25, 'rgba(224, 242, 254, 0.08)');
+  glassSheen.addColorStop(0.5, 'rgba(255, 255, 255, 0.02)');
+  glassSheen.addColorStop(0.75, 'rgba(224, 242, 254, 0.12)');
+  glassSheen.addColorStop(1, 'rgba(255, 255, 255, 0.18)');
+  ctx.fillStyle = glassSheen;
+  ctx.fillRect(cr.x, cr.y, cr.w, cr.h);
+
+  // Diagonal frosted glass reflection streak
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(cr.x + 35, cr.y);
+  ctx.lineTo(cr.x + 105, cr.y);
+  ctx.lineTo(cr.x, cr.y + 105);
+  ctx.lineTo(cr.x, cr.y + 35);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.10)';
+  ctx.fill();
+  ctx.restore();
+
+  // Interior Meeting Table with 4 Rounded Office Chairs
+  const tableX = 130;
+  const tableY = 142;
+  const tableW = 140;
+  const tableH = 66;
+
+  // 4 Rounded Office Chairs (2 North, 2 South)
+  const chairs = [
+    { x: 165, y: 124, backrestY: -3 },
+    { x: 235, y: 124, backrestY: -3 },
+    { x: 165, y: 226, backrestY: 3 },
+    { x: 235, y: 226, backrestY: 3 },
+  ];
+  chairs.forEach((c) => {
+    // Rounded chair seat
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, 9, 0, Math.PI * 2);
+    ctx.fillStyle = '#334155';
+    ctx.fill();
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Curved backrest
+    ctx.beginPath();
+    ctx.arc(c.x, c.y + c.backrestY, 7, 0, Math.PI * 2);
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+
+  // Conference Meeting Table Surface
+  ctx.fillStyle = '#1e293b';
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(tableX, tableY, tableW, tableH, 10);
+  } else {
+    ctx.rect(tableX, tableY, tableW, tableH);
+  }
+  ctx.fill();
+  ctx.strokeStyle = '#0284c7';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Glass Tabletop Inlay & Central Conference Polycom Mic
+  ctx.fillStyle = 'rgba(56, 189, 248, 0.12)';
+  ctx.fillRect(tableX + 14, tableY + 12, tableW - 28, tableH - 24);
+  ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(tableX + 14, tableY + 12, tableW - 28, tableH - 24);
+
+  ctx.beginPath();
+  ctx.arc(tableX + tableW / 2, tableY + tableH / 2, 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#38bdf8';
+  ctx.fill();
+
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = 'bold 9px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Executive Meeting Table', tableX + tableW / 2, tableY + tableH / 2 + 18);
+
+  // Outer Frosted Glass Cyan Wall
   ctx.strokeStyle = cr.border;
   ctx.lineWidth = 4;
   ctx.strokeRect(cr.x, cr.y, cr.w, cr.h);
-  ctx.fillStyle = '#38bdf8';
-  ctx.font = 'bold 13px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText('🔒 Conference Room Alpha (Soundproof)', cr.x + 12, cr.y + 26);
+
+  // Check if any avatars are inside Conference Room Alpha
+  const isAvatarInsideRoom = inRect(me.x, me.y, cr) || Array.from(peers.values()).some((p) => inRect(p.x, p.y, cr));
+
+  if (isAvatarInsideRoom) {
+    // Prominent Glowing Status Sign: 🔒 PRIVATE MEETING IN PROGRESS
+    ctx.save();
+    const signText = '🔒 PRIVATE MEETING IN PROGRESS';
+    ctx.font = 'bold 11px sans-serif';
+    const textWidth = ctx.measureText(signText).width;
+    const signW = textWidth + 24;
+    const signH = 26;
+    const signX = cr.x + (cr.w - signW) / 2;
+    const signY = cr.y + 12;
+
+    // Glowing cyan pulse effect
+    const glowPulse = 12 + Math.sin(timestamp * 0.005) * 4;
+    ctx.shadowColor = '#38bdf8';
+    ctx.shadowBlur = glowPulse;
+
+    ctx.fillStyle = 'rgba(2, 132, 199, 0.92)';
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(signX, signY, signW, signH, 6);
+    } else {
+      ctx.rect(signX, signY, signW, signH);
+    }
+    ctx.fill();
+
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(signText, cr.x + cr.w / 2, signY + signH / 2);
+    ctx.restore();
+  } else {
+    // Available status header
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('🔒 Conference Room Alpha (Soundproof)', cr.x + 12, cr.y + 26);
+  }
 
   // 3. Draw Town Hall Stage & Podium
   const pd = ZONES.podium;

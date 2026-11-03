@@ -104,6 +104,23 @@ h1 {
   color: #e0f2fe;
 }
 
+.badge-private-meeting {
+  background: #0284c7;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.7);
+  border: 1px solid #38bdf8;
+  animation: glow-meeting 2s infinite ease-in-out;
+}
+
+@keyframes glow-meeting {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(56, 189, 248, 0.9);
+  }
+}
+
 .badge-podium {
   background: #ca8a04;
   color: #fef08a;
@@ -252,7 +269,7 @@ h1 {
 }
 
 .box-room {
-  background: rgba(224, 242, 254, 0.4);
+  background: rgba(224, 242, 254, 0.45);
   border: 1.5px solid #0284c7;
 }
 
