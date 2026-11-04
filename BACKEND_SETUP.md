@@ -217,3 +217,5 @@ UserSession model records one stay in one room. Functions: openSession, closeSes
 Session history sheet fields: socketId, joinedAt, leftAt, totalDwellSeconds, zonesVisited. Helpers: recordZoneEntry(userId, zoneId), recordZoneExit(userId, zoneId). joinedAt and leftAt mirror enteredAt and exitedAt and are kept in sync by sessionHistory.js.
 
 Nearby cache bridge: services/spatialCache.js belongs to the leader and is not duplicated. services/nearbyCacheBridge.js is the adapter. It is a no-op while his file is absent. After merge his cache is the only cache and the bridge activates against it with no further change.
+
+Coordinate sanitization: room bounds 0 to 1200 by 0 to 800, distinct from MAX_CANVAS_COORD 100000. Exported functions: validateCanvasCoordinate, validateCanvasPoint, sanitizeGeoJSONPoint, validateRadiusPixels, validateNearbyRequest, asMiddleware. Bad input returns 400. The middleware never imports express so it mounts on the lead's server unchanged.

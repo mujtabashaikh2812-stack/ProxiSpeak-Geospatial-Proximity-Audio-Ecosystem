@@ -11,8 +11,9 @@ const { OfficeZone, zoneContainsCanvasPoint } = require('./models/OfficeZone');
 const { listZones, createZone, findZonesContainingCanvasPoint } = require('./routes/zoneRoutes');
 const sessionHistory = require('./sessionHistory');
 const { UserSession } = require('./models/UserSession');
-const { findUsersNearCanvasPointCached } = require('./proximityService');
+const { findUsersNearCanvasPointCached, findUsersNearCanvasPointGuarded } = require('./proximityService');
 const { createNearbyCacheBridge } = require('./services/nearbyCacheBridge');
+const { sanitizeGeoJSONPoint } = require('./middleware/validateCoordinates');
 
 const QUERY_CENTRE_X = 500;
 const QUERY_CENTRE_Y = 500;
@@ -309,9 +310,23 @@ const seedResult1 = await runSeed();
       'r1=' + r1.cachedSource + ' r2=' + r2.cachedSource + ' storeCount=' + stub.storeCount + ' hitCount=' + stub.hitCount);
     await User.deleteMany({});
 
-    // ---- Check 12: cleanup ----
+    // ---- Check 12: coordinate sanitization guard ----
+    const badUser = await findUsersNearCanvasPointGuarded('', 100, 100, 10, {});
+    const blankOk = badUser.status === 400;
+    const outOfRoom = await findUsersNearCanvasPointGuarded('u', 1500, 900, 10, {});
+    const clampedOk = outOfRoom.status === 200;
+    const nanRes = await findUsersNearCanvasPointGuarded('u', NaN, 100, 10, {});
+    const nanOk = nanRes.status === 400;
+    const swapped = sanitizeGeoJSONPoint({ type: 'Point', coordinates: [200, 100] });
+    const swappedOk = swapped.ok === false;
+    const check12Ok = blankOk && clampedOk && nanOk && swappedOk;
+    record('Check 12: coordinate sanitization guard', check12Ok,
+      'blank=' + badUser.status + ' clamped=' + outOfRoom.status + ' nan=' + nanRes.status + ' swappedRejected=' + swapped.ok);
+    await User.deleteMany({});
+
+    // ---- Check 13: cleanup ----
     await mongoose.connection.dropDatabase();
-    record('Check 12: test database dropped and memory server stopped', true, 'dropped');
+    record('Check 13: test database dropped and memory server stopped', true, 'dropped');
 
   } finally {
     if (mongoose.connection.readyState === 1) {
