@@ -659,16 +659,68 @@ function drawScene(timestamp = 0) {
     ctx.fillText('🔒 Conference Room Alpha (Soundproof)', cr.x + 12, cr.y + 26);
   }
 
-  // 3. Draw Town Hall Stage & Podium
-  const pd = ZONES.podium;
-  ctx.fillStyle = pd.fill;
-  ctx.fillRect(pd.x, pd.y, pd.w, pd.h);
-  ctx.strokeStyle = pd.border;
+  // 3. Draw Town Hall Stage & Podium with Animated Spotlight Beam
+  const podium = ZONES.podium;
+  ctx.fillStyle = podium.fill;
+  ctx.fillRect(podium.x, podium.y, podium.w, podium.h);
+  ctx.strokeStyle = podium.border;
   ctx.lineWidth = 3;
-  ctx.strokeRect(pd.x, pd.y, pd.w, pd.h);
+  ctx.strokeRect(podium.x, podium.y, podium.w, podium.h);
+
+  // When a user steps onto the podium (isOnStage === true)
+  const isPodiumActive = me.isOnStage || Array.from(peers.values()).some((p) => p.isOnStage);
+
+  if (isPodiumActive) {
+    ctx.save();
+    // Gentle breathing pulse for animated spotlight effect
+    const pulse = Math.sin(timestamp * 0.003) * 6;
+    const spotlightRadius = 120 + pulse;
+
+    // Overhead beam cone shining from the ceiling (y = 0) down to the podium
+    ctx.beginPath();
+    ctx.moveTo(podium.x + 90 - 24, 0); // Ceiling fixture
+    ctx.lineTo(podium.x + 90 + 24, 0);
+    ctx.lineTo(podium.x + podium.w + 20, podium.y + podium.h);
+    ctx.lineTo(podium.x - 20, podium.y + podium.h);
+    ctx.closePath();
+
+    const beamGrad = ctx.createLinearGradient(podium.x + 90, 0, podium.x + 90, podium.y + podium.h);
+    beamGrad.addColorStop(0, 'rgba(250, 204, 21, 0.35)');
+    beamGrad.addColorStop(0.35, 'rgba(250, 204, 21, 0.16)');
+    beamGrad.addColorStop(1, 'rgba(250, 204, 21, 0.02)');
+    ctx.fillStyle = beamGrad;
+    ctx.fill();
+
+    // Soft golden radial gradient cone shining onto the podium
+    const grad = ctx.createRadialGradient(
+      podium.x + 90,
+      podium.y + 60,
+      10,
+      podium.x + 90,
+      podium.y + 60,
+      spotlightRadius
+    );
+    grad.addColorStop(0, 'rgba(250, 204, 21, 0.6)');
+    grad.addColorStop(1, 'rgba(250, 204, 21, 0)');
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(podium.x + 90, podium.y + 60, spotlightRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Golden glow border for the stage
+    ctx.shadowColor = '#eab308';
+    ctx.shadowBlur = 14 + pulse;
+    ctx.strokeStyle = '#fde047';
+    ctx.lineWidth = 3.5;
+    ctx.strokeRect(podium.x, podium.y, podium.w, podium.h);
+    ctx.restore();
+  }
+
   ctx.fillStyle = '#fde047';
   ctx.font = 'bold 13px sans-serif';
-  ctx.fillText('🎙️ Town Hall Stage (Broadcast)', pd.x + 10, pd.y + 26);
+  ctx.textAlign = 'left';
+  ctx.fillText('🎙️ Town Hall Stage (Broadcast)', podium.x + 10, podium.y + 24);
 
   // 4. Draw Desks & Computers
   DESKS.forEach((d) => {
