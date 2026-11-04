@@ -15,6 +15,7 @@ const { defaultThrottle } = require('../services/throttleEngine');
 const { SocketClusterAdapter } = require('../services/socketClusterAdapter');
 const { defaultMeshManager } = require('../services/meshManager');
 const { defaultSpatialCache } = require('../services/spatialCache');
+const { defaultSessionAnalytics } = require('../services/sessionAnalytics');
 
 /**
  * In-memory active user registry
@@ -85,6 +86,9 @@ function initSocketServer(httpServer, options = {}) {
       // Register initial position with throttle engine
       defaultThrottle.processMovement(userData.userId, userData.canvasX, userData.canvasY);
 
+      // Start session dwell-time & occupancy tracking (Week 4 Telemetry)
+      defaultSessionAnalytics.startSession(userData);
+
       const allOtherUsers = Array.from(activeUsers.values()).filter(
         (u) => u.socketId !== socket.id
       );
@@ -111,6 +115,7 @@ function initSocketServer(httpServer, options = {}) {
           isCapped: meshAlloc.isCapped,
         },
         zones: OFFICE_ZONES,
+        occupancy: defaultSessionAnalytics.getRoomOccupancy(),
         earshotRadius: EARSHOT_RADIUS,
       });
 
@@ -130,6 +135,9 @@ function initSocketServer(httpServer, options = {}) {
       );
       dispatchProximityTransitions(io, initialTransitions);
 
+      // Broadcast live room occupancy headcounts across the virtual office
+      io.emit('zone:occupancy_update', defaultSessionAnalytics.getRoomOccupancy());
+
       console.log(`[Socket] User joined: ${userData.displayName} at [${userData.canvasX}, ${userData.canvasY}] (${userData.zoneName})`);
     });
 
@@ -142,6 +150,9 @@ function initSocketServer(httpServer, options = {}) {
       if (typeof x === 'number' && typeof y === 'number') {
         user.canvasX = x;
         user.canvasY = y;
+
+        // Update movement odometer in session analytics
+        defaultSessionAnalytics.recordMovement(user.userId, x, y);
 
         // Rate-limit check (30Hz tick & sub-pixel delta compression)
         const throttleCheck = defaultThrottle.processMovement(user.userId, x, y);
@@ -156,6 +167,10 @@ function initSocketServer(httpServer, options = {}) {
           user.zone = newZone.id;
           user.zoneName = newZone.name;
           user.isOnStage = newZone.id === 'podium';
+
+          // Update zone dwell telemetry and broadcast live room headcounts
+          defaultSessionAnalytics.recordZoneTransition(user.userId, prevZoneId, newZone.id, newZone.name);
+          io.emit('zone:occupancy_update', defaultSessionAnalytics.getRoomOccupancy());
 
           socket.emit('zone:changed', {
             zone: newZone.id,
@@ -257,6 +272,10 @@ function initSocketServer(httpServer, options = {}) {
         defaultMeshManager.cleanupUser(user.userId);
         defaultSpatialCache.invalidateUser(user.userId);
 
+        // Finalize session dwell time & persist analytics (Week 4 Telemetry)
+        defaultSessionAnalytics.endSession(user.userId);
+        io.emit('zone:occupancy_update', defaultSessionAnalytics.getRoomOccupancy());
+
         const remainingUsers = Array.from(activeUsers.values());
 
         const departures = cleanupUserProximity(user.userId, remainingUsers);
@@ -357,6 +376,7 @@ module.exports = {
   getClusterAdapter,
   defaultMeshManager,
   defaultSpatialCache,
+  defaultSessionAnalytics,
   activeUsers,
   userToSocket,
 };

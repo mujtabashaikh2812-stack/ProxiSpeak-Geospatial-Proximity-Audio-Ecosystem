@@ -19,6 +19,7 @@ const { defaultSpatialCache } = require('./services/spatialCache');
 const { defaultOcclusionEngine } = require('./services/occlusionEngine');
 const { defaultIntegrationHarness } = require('./services/integrationHarness');
 const { defaultLayoutPersistence } = require('./services/layoutPersistence');
+const { defaultSessionAnalytics } = require('./services/sessionAnalytics');
 
 const app = express();
 const server = http.createServer(app);
@@ -223,6 +224,38 @@ app.post('/api/layout/reset', async (req, res) => {
       details: err.message,
     });
   }
+});
+
+// Real-time room occupancy and capacity telemetry endpoint (Week 4 Telemetry)
+app.get('/api/analytics/occupancy', (req, res) => {
+  res.status(200).json({
+    occupancy: defaultSessionAnalytics.getRoomOccupancy(),
+  });
+});
+
+// Active in-flight user sessions with live dwell-time counters
+app.get('/api/analytics/sessions/active', (req, res) => {
+  res.status(200).json({
+    count: defaultSessionAnalytics.getActiveSessions().length,
+    sessions: defaultSessionAnalytics.getActiveSessions(),
+  });
+});
+
+// System-wide aggregated analytics metrics (averages, distance, popular zones)
+app.get('/api/analytics/summary', async (req, res) => {
+  const metrics = await defaultSessionAnalytics.getAggregatedMetrics();
+  res.status(200).json(metrics);
+});
+
+// User session history endpoint
+app.get('/api/analytics/sessions/:userId', async (req, res) => {
+  const { userId } = req.params;
+  const history = await defaultSessionAnalytics.getUserHistory(userId);
+  res.status(200).json({
+    userId,
+    count: history.length,
+    history,
+  });
 });
 
 if (require.main === module) {
