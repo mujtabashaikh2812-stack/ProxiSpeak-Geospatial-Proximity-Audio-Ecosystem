@@ -219,3 +219,13 @@ Session history sheet fields: socketId, joinedAt, leftAt, totalDwellSeconds, zon
 Nearby cache bridge: services/spatialCache.js belongs to the leader and is not duplicated. services/nearbyCacheBridge.js is the adapter. It is a no-op while his file is absent. After merge his cache is the only cache and the bridge activates against it with no further change.
 
 Coordinate sanitization: room bounds 0 to 1200 by 0 to 800, distinct from MAX_CANVAS_COORD 100000. Exported functions: validateCanvasCoordinate, validateCanvasPoint, sanitizeGeoJSONPoint, validateRadiusPixels, validateNearbyRequest, asMiddleware. Bad input returns 400. The middleware never imports express so it mounts on the lead's server unchanged.
+
+Docker Compose for local MongoDB
+------------------------------------
+
+Command to start: docker compose -f docker-compose.mongo.yml up -d
+Command to check health: docker compose -f docker-compose.mongo.yml ps
+Command to read seeder output: docker compose -f docker-compose.mongo.yml logs seeder
+Command to stop: docker compose -f docker-compose.mongo.yml down
+Warning: down with the -v flag deletes the data volume, do not use it casually.
+This container is standalone on purpose, without a replica set and without transactions, matching how the backend is written.
