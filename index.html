@@ -20,6 +20,11 @@
         <p class="subtitle">Geospatial Proximity Audio Ecosystem</p>
       </div>
 
+      <!-- Avatar Customization Drawer Trigger Button -->
+      <button id="drawerToggleBtn" class="drawer-toggle-btn" type="button">
+        <span class="btn-icon">🎨</span> Customize Avatar
+      </button>
+
       <div class="status-card">
         <div class="status-row">
           <span class="status-label">Current Zone:</span>
@@ -63,6 +68,64 @@
       <canvas id="canvas" width="980" height="620"></canvas>
     </main>
   </div>
+
+  <!-- Collapsible Slide-Out Avatar Customization Drawer -->
+  <aside id="customizationDrawer" class="customization-drawer" aria-hidden="true">
+    <div class="drawer-header">
+      <div class="drawer-title-group">
+        <span class="drawer-icon">🎨</span>
+        <h3>Customize Avatar</h3>
+      </div>
+      <button id="drawerCloseBtn" class="drawer-close-btn" type="button" aria-label="Close drawer">&times;</button>
+    </div>
+
+    <div class="drawer-body">
+      <!-- Live Avatar Preview Card -->
+      <div class="custom-preview-card">
+        <div id="avatarPreviewCircle" class="avatar-preview-circle">
+          <div class="preview-eyes">
+            <span class="preview-pupil"></span>
+            <span class="preview-pupil"></span>
+          </div>
+        </div>
+        <div class="preview-meta">
+          <span id="previewNameLabel" class="preview-name-label">You (Akhila)</span>
+          <span class="preview-sub">Live Avatar Preview</span>
+        </div>
+      </div>
+
+      <!-- Display Name & Role Input -->
+      <div class="drawer-field">
+        <label for="displayNameInput">Display Name & Role Title</label>
+        <input 
+          type="text" 
+          id="displayNameInput" 
+          class="drawer-input" 
+          placeholder="e.g. Akhila (Lead)" 
+          value="You (Akhila)"
+          maxlength="26"
+          autocomplete="off"
+        />
+        <span class="field-hint">Updates your overhead name tag in real time</span>
+      </div>
+
+      <!-- Color Palette Picker -->
+      <div class="drawer-field">
+        <label>Avatar Color Palette</label>
+        <div class="color-palette" id="colorPalette">
+          <button type="button" class="color-swatch active" data-color="#38bdf8" data-name="Sky Blue" title="Sky Blue" style="--swatch-color: #38bdf8;"></button>
+          <button type="button" class="color-swatch" data-color="#10b981" data-name="Emerald Green" title="Emerald Green" style="--swatch-color: #10b981;"></button>
+          <button type="button" class="color-swatch" data-color="#a855f7" data-name="Purple" title="Purple" style="--swatch-color: #a855f7;"></button>
+          <button type="button" class="color-swatch" data-color="#f59e0b" data-name="Amber" title="Amber" style="--swatch-color: #f59e0b;"></button>
+          <button type="button" class="color-swatch" data-color="#f43f5e" data-name="Rose Pink" title="Rose Pink" style="--swatch-color: #f43f5e;"></button>
+        </div>
+        <div id="activeColorName" class="color-name-display">Selected: Sky Blue</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Drawer Backdrop Overlay -->
+  <div id="drawerOverlay" class="drawer-overlay"></div>
 
   <script src="app.js"></script>
 </body>

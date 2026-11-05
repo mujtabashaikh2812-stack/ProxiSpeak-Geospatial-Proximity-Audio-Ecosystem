@@ -17,6 +17,17 @@ const coordsDisplay = document.getElementById('coordsDisplay');
 const peerCountBadge = document.getElementById('peerCountBadge');
 const spotlightAlert = document.getElementById('spotlightAlert');
 
+// Avatar Customization Drawer DOM Elements
+const drawerToggleBtn = document.getElementById('drawerToggleBtn');
+const customizationDrawer = document.getElementById('customizationDrawer');
+const drawerCloseBtn = document.getElementById('drawerCloseBtn');
+const drawerOverlay = document.getElementById('drawerOverlay');
+const displayNameInput = document.getElementById('displayNameInput');
+const avatarPreviewCircle = document.getElementById('avatarPreviewCircle');
+const previewNameLabel = document.getElementById('previewNameLabel');
+const activeColorName = document.getElementById('activeColorName');
+const colorPalette = document.getElementById('colorPalette');
+
 // Proximity & Spatial constants
 const EARSHOT_RADIUS = 100; // px
 const LERP_FACTOR = 0.2;
@@ -213,6 +224,14 @@ if (!isLiveSocket) {
 // Keyboard Input Handler (Movement + Push-to-Talk via Space or V)
 const keys = {};
 document.addEventListener('keydown', (e) => {
+  // Ignore movement & push-to-talk keys when typing in input fields
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+    if (e.key === 'Escape' && customizationDrawer && customizationDrawer.classList.contains('open')) {
+      closeDrawer();
+    }
+    return;
+  }
+
   keys[e.key.toLowerCase()] = true;
   keys[e.key] = true;
 
@@ -229,6 +248,10 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.addEventListener('keyup', (e) => {
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+    return;
+  }
+
   keys[e.key.toLowerCase()] = false;
   keys[e.key] = false;
 
@@ -242,6 +265,83 @@ document.addEventListener('keyup', (e) => {
     }
   }
 });
+
+// --- Avatar Customization Drawer Controller ---
+function openDrawer() {
+  if (!customizationDrawer) return;
+  customizationDrawer.classList.add('open');
+  customizationDrawer.setAttribute('aria-hidden', 'false');
+  if (drawerOverlay) drawerOverlay.classList.add('open');
+  if (displayNameInput) {
+    displayNameInput.value = me.name;
+    displayNameInput.focus();
+  }
+}
+
+function closeDrawer() {
+  if (!customizationDrawer) return;
+  customizationDrawer.classList.remove('open');
+  customizationDrawer.setAttribute('aria-hidden', 'true');
+  if (drawerOverlay) drawerOverlay.classList.remove('open');
+  canvas.focus();
+}
+
+if (drawerToggleBtn) {
+  drawerToggleBtn.addEventListener('click', () => {
+    if (customizationDrawer && customizationDrawer.classList.contains('open')) {
+      closeDrawer();
+    } else {
+      openDrawer();
+    }
+  });
+}
+
+if (drawerCloseBtn) {
+  drawerCloseBtn.addEventListener('click', closeDrawer);
+}
+
+if (drawerOverlay) {
+  drawerOverlay.addEventListener('click', closeDrawer);
+}
+
+// Display Name & Role Input Handler
+if (displayNameInput) {
+  displayNameInput.addEventListener('input', (e) => {
+    const val = e.target.value.trim();
+    me.name = val || 'You (Akhila)';
+    if (previewNameLabel) {
+      previewNameLabel.textContent = me.name;
+    }
+    if (socket && isLiveSocket) {
+      socket.emit('player:update', { userId: me.id, displayName: me.name, color: me.color });
+    }
+  });
+}
+
+// Color Palette Swatches Handler (Sky Blue, Emerald Green, Purple, Amber, Rose Pink)
+if (colorPalette) {
+  colorPalette.querySelectorAll('.color-swatch').forEach((swatch) => {
+    swatch.addEventListener('click', () => {
+      colorPalette.querySelectorAll('.color-swatch').forEach((s) => s.classList.remove('active'));
+      swatch.classList.add('active');
+
+      const chosenColor = swatch.getAttribute('data-color');
+      const colorName = swatch.getAttribute('data-name') || 'Custom';
+
+      me.color = chosenColor;
+      if (avatarPreviewCircle) {
+        avatarPreviewCircle.style.background = chosenColor;
+      }
+      if (activeColorName) {
+        activeColorName.textContent = `Selected: ${colorName}`;
+      }
+
+      if (socket && isLiveSocket) {
+        socket.emit('player:update', { userId: me.id, displayName: me.name, color: me.color });
+      }
+    });
+  });
+}
 
 function movePlayer() {
   let dx = 0;
