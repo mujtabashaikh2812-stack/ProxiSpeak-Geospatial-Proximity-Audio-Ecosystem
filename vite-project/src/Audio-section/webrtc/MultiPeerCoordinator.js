@@ -18,8 +18,47 @@ export class MultiPeerCoordinator {
 
     this.peers = new Map(); // peerId -> { pc, stream, sourceNode, gainNode, pannerNode, isMuted }
     this.pendingIceCandidates = new Map(); // peerId -> Array<RTCIceCandidate>
+    this.demotedPeers = new Set(); // peerIds demoted by backend mesh cap
     this.onRemoteStream = options.onRemoteStream || (() => {});
     this.onPeerDisconnected = options.onPeerDisconnected || (() => {});
+
+    // Bind backend mesh capping listener if socket provided
+    if (this.socket) {
+      this.bindMeshUpdateListener(this.socket);
+    }
+  }
+
+  /**
+   * Listens for backend WebRTC mesh connection capping and priority reallocations
+   */
+  bindMeshUpdateListener(socket) {
+    socket.on('mesh:update', ({ activePeerIds = [], promoted = [], demoted = [], isCapped }) => {
+      console.log(`[MultiPeerCoordinator] Mesh update: ${activePeerIds.length} active peers, isCapped: ${isCapped}`);
+
+      // Handle demoted peers (surpassed max 6 peer cap)
+      for (const peerId of demoted) {
+        this.demotedPeers.add(peerId);
+        const peerData = this.peers.get(peerId);
+        if (peerData && peerData.gainNode) {
+          const now = this.audioContext.currentTime;
+          peerData.gainNode.gain.linearRampToValueAtTime(0.0, now + 0.1);
+        }
+      }
+
+      // Handle promoted peers (freed up mesh slot)
+      for (const peerId of promoted) {
+        this.demotedPeers.delete(peerId);
+        const peerData = this.peers.get(peerId);
+        if (peerData && peerData.gainNode) {
+          const now = this.audioContext.currentTime;
+          peerData.gainNode.gain.linearRampToValueAtTime(1.0, now + 0.1);
+        }
+      }
+    });
+  }
+
+  isPeerDemoted(peerId) {
+    return this.demotedPeers.has(peerId);
   }
 
   getOrCreatePeer(peerId) {
