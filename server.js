@@ -20,6 +20,7 @@ const { defaultOcclusionEngine } = require('./services/occlusionEngine');
 const { defaultIntegrationHarness } = require('./services/integrationHarness');
 const { defaultLayoutPersistence } = require('./services/layoutPersistence');
 const { defaultSessionAnalytics } = require('./services/sessionAnalytics');
+const { defaultAudioBridge } = require('./services/audioBridge');
 
 const app = express();
 const server = http.createServer(app);
@@ -255,6 +256,36 @@ app.get('/api/analytics/sessions/:userId', async (req, res) => {
     userId,
     count: history.length,
     history,
+  });
+});
+
+// Spatial audio routing matrix for a specific listener avatar (Week 4 Audio Bridge)
+app.get('/api/audio/matrix/:userId', (req, res) => {
+  const { userId } = req.params;
+  const allUsers = getActiveUsers();
+  const listener = allUsers.find((u) => u.userId === userId);
+
+  if (!listener) {
+    return res.status(404).json({ error: `User with id "${userId}" is not currently connected` });
+  }
+
+  const matrix = defaultAudioBridge.computeAudioMatrix(listener, allUsers);
+  res.status(200).json(matrix);
+});
+
+// Audio bridge system diagnostics
+app.get('/api/audio/diagnostics', (req, res) => {
+  res.status(200).json(defaultAudioBridge.getDiagnostics());
+});
+
+// Update audio state (mute/speaking) via REST
+app.post('/api/audio/state/:userId', (req, res) => {
+  const { userId } = req.params;
+  const { isMuted, isSpeaking, volumeBoost } = req.body;
+  const updated = defaultAudioBridge.setUserAudioState(userId, { isMuted, isSpeaking, volumeBoost });
+  res.status(200).json({
+    message: 'Audio state updated',
+    audioState: updated,
   });
 });
 

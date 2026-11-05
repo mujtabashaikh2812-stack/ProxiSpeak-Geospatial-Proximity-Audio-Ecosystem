@@ -16,6 +16,7 @@ const { SocketClusterAdapter } = require('../services/socketClusterAdapter');
 const { defaultMeshManager } = require('../services/meshManager');
 const { defaultSpatialCache } = require('../services/spatialCache');
 const { defaultSessionAnalytics } = require('../services/sessionAnalytics');
+const { defaultAudioBridge } = require('../services/audioBridge');
 
 /**
  * In-memory active user registry
@@ -262,6 +263,19 @@ function initSocketServer(httpServer, options = {}) {
       }
     });
 
+    // Handle audio state update (mute/speaking telemetry)
+    socket.on('audio:state', (payload = {}) => {
+      const user = activeUsers.get(socket.id);
+      if (!user) return;
+      const { isMuted, isSpeaking } = payload;
+      defaultAudioBridge.setUserAudioState(user.userId, { isMuted, isSpeaking });
+      socket.broadcast.emit('peer:audio_state', {
+        userId: user.userId,
+        isMuted,
+        isSpeaking,
+      });
+    });
+
     // Handle peer disconnect
     socket.on('disconnect', (reason) => {
       const user = activeUsers.get(socket.id);
@@ -271,6 +285,7 @@ function initSocketServer(httpServer, options = {}) {
         defaultThrottle.cleanupPlayer(user.userId);
         defaultMeshManager.cleanupUser(user.userId);
         defaultSpatialCache.invalidateUser(user.userId);
+        defaultAudioBridge.cleanupUser(user.userId);
 
         // Finalize session dwell time & persist analytics (Week 4 Telemetry)
         defaultSessionAnalytics.endSession(user.userId);
@@ -377,6 +392,7 @@ module.exports = {
   defaultMeshManager,
   defaultSpatialCache,
   defaultSessionAnalytics,
+  defaultAudioBridge,
   activeUsers,
   userToSocket,
 };
