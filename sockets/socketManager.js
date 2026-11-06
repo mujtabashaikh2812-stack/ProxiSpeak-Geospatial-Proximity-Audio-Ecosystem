@@ -17,6 +17,7 @@ const { defaultMeshManager } = require('../services/meshManager');
 const { defaultSpatialCache } = require('../services/spatialCache');
 const { defaultSessionAnalytics } = require('../services/sessionAnalytics');
 const { defaultAudioBridge } = require('../services/audioBridge');
+const { defaultTelemetryMonitor } = require('../services/telemetryMonitor');
 
 /**
  * In-memory active user registry
@@ -276,6 +277,26 @@ function initSocketServer(httpServer, options = {}) {
       });
     });
 
+    // Network latency RTT ping/pong (Week 4 QoS Telemetry)
+    socket.on('telemetry:ping', (payload = {}) => {
+      const user = activeUsers.get(socket.id);
+      if (!user) return;
+      const clientTimestamp = payload.timestamp || Date.now();
+      const result = defaultTelemetryMonitor.recordPing(user.userId, clientTimestamp);
+      socket.emit('telemetry:pong', {
+        serverTimestamp: Date.now(),
+        ...result,
+      });
+    });
+
+    // WebRTC client packet loss and jitter telemetry report
+    socket.on('telemetry:report', (report = {}) => {
+      const user = activeUsers.get(socket.id);
+      if (!user) return;
+      const health = defaultTelemetryMonitor.recordPacketReport(user.userId, report);
+      socket.emit('telemetry:health', health);
+    });
+
     // Handle peer disconnect
     socket.on('disconnect', (reason) => {
       const user = activeUsers.get(socket.id);
@@ -286,6 +307,7 @@ function initSocketServer(httpServer, options = {}) {
         defaultMeshManager.cleanupUser(user.userId);
         defaultSpatialCache.invalidateUser(user.userId);
         defaultAudioBridge.cleanupUser(user.userId);
+        defaultTelemetryMonitor.cleanupUser(user.userId);
 
         // Finalize session dwell time & persist analytics (Week 4 Telemetry)
         defaultSessionAnalytics.endSession(user.userId);
@@ -393,6 +415,7 @@ module.exports = {
   defaultSpatialCache,
   defaultSessionAnalytics,
   defaultAudioBridge,
+  defaultTelemetryMonitor,
   activeUsers,
   userToSocket,
 };

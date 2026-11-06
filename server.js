@@ -21,6 +21,7 @@ const { defaultIntegrationHarness } = require('./services/integrationHarness');
 const { defaultLayoutPersistence } = require('./services/layoutPersistence');
 const { defaultSessionAnalytics } = require('./services/sessionAnalytics');
 const { defaultAudioBridge } = require('./services/audioBridge');
+const { defaultTelemetryMonitor } = require('./services/telemetryMonitor');
 
 const app = express();
 const server = http.createServer(app);
@@ -287,6 +288,25 @@ app.post('/api/audio/state/:userId', (req, res) => {
     message: 'Audio state updated',
     audioState: updated,
   });
+});
+
+// System-wide network QoS telemetry & health metrics (Week 4 Observability)
+app.get('/api/telemetry/network', (req, res) => {
+  res.status(200).json(defaultTelemetryMonitor.getSystemMetrics());
+});
+
+// Granular network health scorecard for a specific avatar
+app.get('/api/telemetry/peers/:userId', (req, res) => {
+  const { userId } = req.params;
+  res.status(200).json(defaultTelemetryMonitor.analyzePeerHealth(userId));
+});
+
+// Record ping sample for latency telemetry
+app.post('/api/telemetry/ping/:userId', (req, res) => {
+  const { userId } = req.params;
+  const { clientTimestamp = Date.now() - 25 } = req.body;
+  const result = defaultTelemetryMonitor.recordPing(userId, clientTimestamp);
+  res.status(200).json(result);
 });
 
 if (require.main === module) {
