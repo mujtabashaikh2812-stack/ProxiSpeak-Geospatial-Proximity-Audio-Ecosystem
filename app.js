@@ -79,6 +79,8 @@ const DESKS = [
 
 // Remote Peers (Live or Mock fallback)
 let peers = new Map();
+let autoNavigationTargetId = null;
+const coworkerListItems = new Map();
 
 // Check if Point is inside rectangle
 function inRect(x, y, rect) {
@@ -221,6 +223,15 @@ if (!isLiveSocket) {
   });
 }
 
+userList.addEventListener('click', (event) => {
+  const button = event.target instanceof Element ? event.target.closest('.walk-to-button') : null;
+  if (!button || !userList.contains(button)) return;
+
+  const peerId = button.dataset.peerId;
+  if (!peers.has(peerId)) return;
+  autoNavigationTargetId = autoNavigationTargetId === peerId ? null : peerId;
+});
+
 // Keyboard Input Handler (Movement + Push-to-Talk via Space or V)
 const keys = {};
 document.addEventListener('keydown', (e) => {
@@ -352,6 +363,28 @@ function movePlayer() {
   if (keys['d'] || keys['arrowright']) dx += me.speed;
 
   if (dx !== 0 || dy !== 0) {
+    autoNavigationTargetId = null;
+  } else if (autoNavigationTargetId !== null) {
+    const target = peers.get(autoNavigationTargetId);
+    if (!target) {
+      autoNavigationTargetId = null;
+    } else {
+      const targetDx = target.x - me.x;
+      const targetDy = target.y - me.y;
+      const remainingDistance = Math.hypot(targetDx, targetDy);
+
+      if (remainingDistance <= me.speed) {
+        me.x = target.x;
+        me.y = target.y;
+        autoNavigationTargetId = null;
+      } else {
+        dx = (targetDx / remainingDistance) * me.speed;
+        dy = (targetDy / remainingDistance) * me.speed;
+      }
+    }
+  }
+
+  if (dx !== 0 || dy !== 0) {
     // Track movement direction angle
     me.facingAngle = Math.atan2(dy, dx);
     me.x = Math.max(30, Math.min(canvas.width - 30, me.x + dx));
@@ -392,36 +425,73 @@ function updateHUD() {
 
   spotlightAlert.style.display = me.isOnStage ? 'block' : 'none';
 
-  // Render User List Sidebar
-  let listHtml = '';
+  // Keep the roster keyed by peer so live distance updates do not replace focused controls.
+  const onlinePeerIds = new Set();
   peers.forEach((peer) => {
+    onlinePeerIds.add(peer.id);
     const d = distance(me, peer);
-    let canHear = false;
-    let tag = '';
+    let item = coworkerListItems.get(peer.id);
+    if (!item) {
+      item = document.createElement('li');
+      item.className = 'coworker-item';
 
-    if (peer.isOnStage || me.isOnStage) {
-      canHear = true;
-      tag = '<span class="tag-audible">📢 Stage (100%)</span>';
-    } else if (me.zone === 'conference' && getCurrentZone(peer.x, peer.y) === 'conference') {
-      canHear = true;
-      tag = '<span class="tag-audible">🔒 Room (95%)</span>';
-    } else if (me.zone === 'open' && getCurrentZone(peer.x, peer.y) === 'open' && d <= EARSHOT_RADIUS) {
-      const vol = Math.round((1 - d / EARSHOT_RADIUS) * 100);
-      canHear = true;
-      tag = `<span class="tag-audible">👂 ${d}px (${vol}%)</span>`;
-    } else {
-      canHear = false;
-      tag = `<span class="tag-inaudible">🔇 Silent (${d}px)</span>`;
+      const details = document.createElement('div');
+      details.className = 'coworker-details';
+
+      const name = document.createElement('span');
+      name.className = 'coworker-name';
+
+      const distanceLabel = document.createElement('span');
+      distanceLabel.className = 'coworker-distance';
+
+      const rangeLabel = document.createElement('span');
+      rangeLabel.className = 'coworker-range';
+
+      const walkButton = document.createElement('button');
+      walkButton.className = 'walk-to-button';
+      walkButton.type = 'button';
+
+      details.append(name, distanceLabel, rangeLabel);
+      item.append(details, walkButton);
+      coworkerListItems.set(peer.id, { item, name, distanceLabel, rangeLabel, walkButton });
     }
 
-    if (peer.isSpeaking) {
-      tag += ' <span class="tag-speaking">🎙️ Speaking</span>';
-    }
-
-    listHtml += `<li><span>${peer.name}</span> ${tag}</li>`;
+    const elements = coworkerListItems.get(peer.id);
+    elements.name.textContent = peer.name;
+    elements.distanceLabel.textContent = `${d}px`;
+    const inEarshot = d <= EARSHOT_RADIUS;
+    elements.rangeLabel.textContent = inEarshot ? 'In Earshot 🟢' : 'Out of Range ⚪';
+    elements.rangeLabel.className = `coworker-range ${inEarshot ? 'in-earshot' : 'out-of-range'}`;
+    if (peer.isSpeaking) elements.rangeLabel.textContent += ' · 🎙️ Speaking';
+    elements.walkButton.dataset.peerId = peer.id;
+    const isTarget = autoNavigationTargetId === peer.id;
+    elements.walkButton.textContent = isTarget ? 'Stop' : 'Walk to';
+    elements.walkButton.setAttribute('aria-pressed', String(isTarget));
+    elements.walkButton.setAttribute(
+      'aria-label',
+      isTarget ? `Stop walking to ${peer.name}` : `Walk to ${peer.name}`,
+    );
+    if (elements.item.parentElement !== userList) userList.append(elements.item);
   });
 
-  userList.innerHTML = listHtml || '<li class="empty-state">No coworkers nearby</li>';
+  coworkerListItems.forEach((elements, peerId) => {
+    if (!onlinePeerIds.has(peerId)) {
+      elements.item.remove();
+      coworkerListItems.delete(peerId);
+      if (autoNavigationTargetId === peerId) autoNavigationTargetId = null;
+    }
+  });
+
+  if (coworkerListItems.size === 0) {
+    if (!userList.querySelector('.empty-state')) {
+      const emptyState = document.createElement('li');
+      emptyState.className = 'empty-state';
+      emptyState.textContent = 'No coworkers nearby';
+      userList.append(emptyState);
+    }
+  } else {
+    userList.querySelector('.empty-state')?.remove();
+  }
 }
 
 // Canvas Drawing Routines
