@@ -242,3 +242,24 @@ Commands:
 - node scripts/migrateIndexes.js --dropLegacy also drops the single field location_2dsphere index. Only use it once nothing queries by location without a status filter.
 
 Each run prints PASS or FAIL lines, including an explain("executionStats") proof for a status online query with $near and $maxDistance: the winning index name, keysExamined, docsExamined and executionTimeMillis. The script exits 1 if any check fails. The same command is available as npm run migrate:indexes.
+
+## Load test
+
+Command: npm run loadtest (the same as node benchmark/loadTest.js). It fires many findUsersNearCanvasPoint calls at the same time and reports how long each one took.
+
+Options:
+- --concurrency N is how many queries are in flight at once. Default 100.
+- --total N is how many queries are fired in all. Default 500.
+- --radius N is the search radius in canvas pixels. Default 100.
+- --users N is how many avatars are seeded. Default 300, with roughly a quarter inside the radius of the test point and the rest outside it.
+- --memory forces the temporary in-memory MongoDB even when MONGODB_URI is set.
+
+Avatars are moved (re-seeded) between waves of queries, so the queries see moving avatars and not one static snapshot. Before measuring, one warm-up round opens the connection pool; those queries are not counted.
+
+Metrics: total queries is the number requested and completed is the number that finished. Wall clock ms is the time spent running the query waves, with re-seeding excluded. Throughput is successful queries per second over that wall clock time. Latency min, median, mean, p95, p99 and max are in milliseconds per query; p95 means 95 percent of queries were faster than that number. Percentiles use linear interpolation between neighbouring samples. Errors is the number of queries that threw.
+
+The run prints one PASS or FAIL line each for: error count is zero, all requested queries completed, and p95 latency strictly under 20 ms. It exits 1 if any fails. The 20 ms budget is not loosened to make a run pass.
+
+When MONGODB_URI is not set, the test starts a temporary in-memory MongoDB by default and drops its database at the end, so it runs on any machine with no Docker and no installed MongoDB. If MONGODB_URI is set and --memory is not given, the avatars are written under the prefix loadtest:avatar: and removed afterwards; production looking URIs are refused.
+
+The figures are from an in-memory single node database on the same machine and are not a production network number; a networked figure needs the Docker container in docker-compose.mongo.yml.
