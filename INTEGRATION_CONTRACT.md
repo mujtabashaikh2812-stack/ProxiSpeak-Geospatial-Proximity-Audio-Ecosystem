@@ -85,3 +85,7 @@ Session history sheet fields: socketId, joinedAt, leftAt, totalDwellSeconds, zon
 Nearby cache bridge: services/spatialCache.js belongs to the leader and is not duplicated. services/nearbyCacheBridge.js is the adapter. It is a no-op while his file is absent. After merge his cache is the only cache and the bridge activates against it with no further change.
 
 Coordinate sanitization: room bounds 0 to 1200 by 0 to 800, distinct from MAX_CANVAS_COORD 100000. Exported functions: validateCanvasCoordinate, validateCanvasPoint, sanitizeGeoJSONPoint, validateRadiusPixels, validateNearbyRequest, asMiddleware. Bad input returns 400. The middleware never imports express so it mounts on the lead's server unchanged.
+
+## Index migration
+
+Users now carry a status field (online, idle, offline; default offline) and a compound index { status: 1, location: '2dsphere' } for queries that filter by status and then search by distance. Status was added because it did not exist and the compound index needs it as its leading key. The single field location index is kept by default. Commands: node scripts/migrateIndexes.js, node scripts/migrateIndexes.js --memory and node scripts/migrateIndexes.js --dropLegacy. The drop flag is opt in because proximity queries that do not filter status still rely on the single field index.

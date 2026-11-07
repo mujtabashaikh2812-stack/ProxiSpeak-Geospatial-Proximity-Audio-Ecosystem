@@ -10,7 +10,8 @@
     "demo": "node queryDemo.js",
     "benchmark": "node benchmark.js",
     "verify:db": "node verifyDb.js",
-    "seed:zones": "node scripts/seedZones.js"
+    "seed:zones": "node scripts/seedZones.js",
+    "migrate:indexes": "node scripts/migrateIndexes.js"
   },
   "repository": {
     "type": "git",

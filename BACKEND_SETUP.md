@@ -229,3 +229,16 @@ Command to read seeder output: docker compose -f docker-compose.mongo.yml logs s
 Command to stop: docker compose -f docker-compose.mongo.yml down
 Warning: down with the -v flag deletes the data volume, do not use it casually.
 This container is standalone on purpose, without a replica set and without transactions, matching how the backend is written.
+
+## Index migration
+
+The users collection now has a status field (online, idle or offline, default offline) and a compound index on status ascending plus location 2dsphere, named status_1_location_2dsphere. The status field was added because the compound index needs something to lead with: before this change the User model had no status at all. The compound index serves queries that filter by status and then search by distance, so a query for online users only walks index entries that belong to online users.
+
+The single field location_2dsphere index is kept by default. proximityService.js runs $near queries that do not filter by status, and those still rely on the single field index. Dropping it is opt in.
+
+Commands:
+- node scripts/migrateIndexes.js migrates the database named by MONGODB_URI. It refuses to run when the URI looks like production, creates the compound index only when it is missing, and prints the index list before and after.
+- node scripts/migrateIndexes.js --memory does the same against a temporary in-memory MongoDB, so it runs with no Docker and no installed MongoDB. The temporary database is dropped and the server stopped at the end.
+- node scripts/migrateIndexes.js --dropLegacy also drops the single field location_2dsphere index. Only use it once nothing queries by location without a status filter.
+
+Each run prints PASS or FAIL lines, including an explain("executionStats") proof for a status online query with $near and $maxDistance: the winning index name, keysExamined, docsExamined and executionTimeMillis. The script exits 1 if any check fails. The same command is available as npm run migrate:indexes.

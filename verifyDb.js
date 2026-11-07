@@ -324,9 +324,35 @@ const seedResult1 = await runSeed();
       'blank=' + badUser.status + ' clamped=' + outOfRoom.status + ' nan=' + nanRes.status + ' swappedRejected=' + swapped.ok);
     await User.deleteMany({});
 
-    // ---- Check 13: cleanup ----
+    // ---- Check 13: compound status and 2dsphere index ----
+    const declared = User.schema.indexes().some(
+      ([key]) => key && key.status === 1 && key.location === '2dsphere' && Object.keys(key).length === 2
+    );
+    await User.createIndexes();
+    const [cmpLng, cmpLat] = canvasToGeoJSON(QUERY_CENTRE_X, QUERY_CENTRE_Y);
+    const [cmpUserLng, cmpUserLat] = canvasToGeoJSON(QUERY_CENTRE_X + 10, QUERY_CENTRE_Y);
+    await User.create([
+      { userId: 'cmp:online', status: 'online', location: { type: 'Point', coordinates: [cmpUserLng, cmpUserLat] }, canvasX: QUERY_CENTRE_X + 10, canvasY: QUERY_CENTRE_Y },
+      { userId: 'cmp:offline', status: 'offline', location: { type: 'Point', coordinates: [cmpUserLng, cmpUserLat] }, canvasX: QUERY_CENTRE_X + 10, canvasY: QUERY_CENTRE_Y },
+    ]);
+    const cmpExplain = await User.find({
+      status: 'online',
+      location: { $near: { $geometry: { type: 'Point', coordinates: [cmpLng, cmpLat] }, $maxDistance: RADIUS_PIXELS } },
+    }).explain('executionStats');
+    const cmpPlanText = JSON.stringify(cmpExplain.queryPlanner.winningPlan);
+    const cmpIndexMatch = cmpPlanText.match(/"indexName":"([^"]+)"/);
+    const cmpIndexName = cmpIndexMatch ? cmpIndexMatch[1] : null;
+    const cmpIndexes = await User.collection.indexes();
+    const legacyStillListed = cmpIndexes.some((i) => i.key && Object.keys(i.key).length === 1 && i.key.location === '2dsphere');
+    const check14Ok = declared && !!cmpIndexName && cmpIndexName.includes('status') && legacyStillListed;
+    record('Check 13: compound status and 2dsphere index', check14Ok,
+      'declared=' + declared + ' winningIndex=' + cmpIndexName + ' keysExamined=' + cmpExplain.executionStats.totalKeysExamined +
+      ' docsExamined=' + cmpExplain.executionStats.totalDocsExamined + ' legacyStillListed=' + legacyStillListed);
+    await User.deleteMany({});
+
+    // ---- Check 14: cleanup ----
     await mongoose.connection.dropDatabase();
-    record('Check 13: test database dropped and memory server stopped', true, 'dropped');
+    record('Check 14: test database dropped and memory server stopped', true, 'dropped');
 
   } finally {
     if (mongoose.connection.readyState === 1) {

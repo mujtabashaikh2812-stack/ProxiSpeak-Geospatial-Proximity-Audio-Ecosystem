@@ -71,10 +71,23 @@ const UserSchema = new mongoose.Schema(
       required: false,
       default: Date.now, // used by session pruning
     },
+    status: {
+      type: String,
+      enum: {
+        values: ['online', 'idle', 'offline'],
+        message: 'status must be one of: online, idle, offline',
+      },
+      default: 'offline',
+      trim: true,
+    },
   },
   { strict: true }
 );
 
 UserSchema.index({ location: '2dsphere' });
+
+// Compound index for queries that filter by status and then search by distance.
+// The single field location index above is retained for queries that do not filter status.
+UserSchema.index({ status: 1, location: '2dsphere' });
 
 module.exports = mongoose.model('User', UserSchema);
