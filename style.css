@@ -683,6 +683,11 @@ kbd {
   transform: scale(1.15);
 }
 
+.color-swatch:focus-visible {
+  outline: 2px solid #f8fafc;
+  outline-offset: 3px;
+}
+
 .color-swatch.active {
   transform: scale(1.15);
   box-shadow: 0 0 0 3px #1e293b, 0 0 0 5px var(--swatch-color);
