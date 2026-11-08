@@ -343,6 +343,17 @@ virtualControls.forEach((button) => {
 });
 
 window.addEventListener('blur', () => {
+  Object.keys(keys).forEach((key) => {
+    keys[key] = false;
+  });
+
+  if (me.isSpeaking) {
+    me.isSpeaking = false;
+    if (socket && isLiveSocket) {
+      socket.emit('player:speaking', { userId: me.id, isSpeaking: false });
+    }
+  }
+
   virtualControls.forEach((button) => {
     releaseVirtualControl(button, button.dataset.key);
   });
