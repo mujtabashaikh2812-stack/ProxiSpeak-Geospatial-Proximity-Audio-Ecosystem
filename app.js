@@ -433,6 +433,12 @@ function movePlayer() {
   if (keys['a'] || keys['arrowleft']) dx -= me.speed;
   if (keys['d'] || keys['arrowright']) dx += me.speed;
 
+  const movementMagnitude = Math.hypot(dx, dy);
+  if (movementMagnitude > me.speed) {
+    dx = (dx / movementMagnitude) * me.speed;
+    dy = (dy / movementMagnitude) * me.speed;
+  }
+
   if (dx !== 0 || dy !== 0) {
     autoNavigationTargetId = null;
   } else if (autoNavigationTargetId !== null) {
