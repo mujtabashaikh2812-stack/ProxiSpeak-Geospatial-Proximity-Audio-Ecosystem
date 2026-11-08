@@ -12,12 +12,24 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const canvasWidth = canvas.width;
 const canvasHeight = canvas.height;
-const dpr = window.devicePixelRatio || 1;
+let dpr = window.devicePixelRatio || 1;
 canvas.width = canvasWidth * dpr;
 canvas.height = canvasHeight * dpr;
 canvas.style.width = `${canvasWidth}px`;
 canvas.style.height = `${canvasHeight}px`;
 ctx.scale(dpr, dpr);
+
+function updateCanvasResolution() {
+  const nextDpr = window.devicePixelRatio || 1;
+  if (nextDpr === dpr) return;
+
+  dpr = nextDpr;
+  canvas.width = canvasWidth * dpr;
+  canvas.height = canvasHeight * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+window.addEventListener('resize', updateCanvasResolution);
 const statusText = document.getElementById('statusText');
 const userList = document.getElementById('userList');
 const zoneBadge = document.getElementById('zoneBadge');
