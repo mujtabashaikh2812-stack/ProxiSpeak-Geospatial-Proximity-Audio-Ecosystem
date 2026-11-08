@@ -381,6 +381,61 @@ kbd {
   flex: 1;
 }
 
+.virtual-dpad {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  z-index: 11;
+  display: grid;
+  grid-template-columns: repeat(3, 58px);
+  grid-template-rows: repeat(3, 58px);
+  gap: 5px;
+  touch-action: none;
+  user-select: none;
+}
+
+.virtual-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid #38bdf8;
+  border-radius: 12px;
+  color: #f8fafc;
+  cursor: pointer;
+  font-size: 1.4rem;
+  font-weight: 700;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
+
+.virtual-control:active,
+.virtual-control[aria-pressed="true"] {
+  background: #0369a1;
+  border-color: #7dd3fc;
+}
+
+.virtual-control:focus-visible {
+  outline: 2px solid #f8fafc;
+  outline-offset: 2px;
+}
+
+.virtual-control-up {
+  grid-area: 1 / 2;
+}
+
+.virtual-control-left {
+  grid-area: 2 / 1;
+}
+
+.virtual-control-down {
+  grid-area: 2 / 2;
+}
+
+.virtual-control-right {
+  grid-area: 2 / 3;
+}
+
 .spotlight-banner {
   display: none;
   position: absolute;

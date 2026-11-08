@@ -277,6 +277,69 @@ document.addEventListener('keyup', (e) => {
   }
 });
 
+// Virtual D-pad forwards touch holds through the existing keyboard movement handler.
+const virtualControls = document.querySelectorAll('.virtual-control');
+const activeTouchesByControl = new Map();
+
+function dispatchMovementKey(type, key) {
+  const code = `Key${key.toUpperCase()}`;
+  document.dispatchEvent(new KeyboardEvent(type, {
+    key,
+    code,
+    bubbles: true,
+    cancelable: true,
+  }));
+}
+
+function releaseVirtualControl(button, key) {
+  const activeTouches = activeTouchesByControl.get(button);
+  if (!activeTouches || activeTouches.size === 0) return;
+
+  activeTouches.clear();
+  button.setAttribute('aria-pressed', 'false');
+  dispatchMovementKey('keyup', key);
+}
+
+virtualControls.forEach((button) => {
+  const key = button.dataset.key;
+  const activeTouches = new Set();
+  activeTouchesByControl.set(button, activeTouches);
+
+  button.addEventListener('touchstart', (event) => {
+    event.preventDefault();
+    const wasInactive = activeTouches.size === 0;
+    for (const touch of event.changedTouches) {
+      activeTouches.add(touch.identifier);
+    }
+
+    if (wasInactive && activeTouches.size > 0) {
+      button.setAttribute('aria-pressed', 'true');
+      dispatchMovementKey('keydown', key);
+    }
+  }, { passive: false });
+
+  const endTouch = (event) => {
+    event.preventDefault();
+    for (const touch of event.changedTouches) {
+      activeTouches.delete(touch.identifier);
+    }
+
+    if (activeTouches.size === 0) {
+      button.setAttribute('aria-pressed', 'false');
+      dispatchMovementKey('keyup', key);
+    }
+  };
+
+  button.addEventListener('touchend', endTouch, { passive: false });
+  button.addEventListener('touchcancel', endTouch, { passive: false });
+});
+
+window.addEventListener('blur', () => {
+  virtualControls.forEach((button) => {
+    releaseVirtualControl(button, button.dataset.key);
+  });
+});
+
 // --- Avatar Customization Drawer Controller ---
 function openDrawer() {
   if (!customizationDrawer) return;
