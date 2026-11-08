@@ -255,11 +255,13 @@ userList.addEventListener('click', (event) => {
 // Keyboard Input Handler (Movement + Push-to-Talk via Space or V)
 const keys = {};
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && customizationDrawer && customizationDrawer.classList.contains('open')) {
+    closeDrawer();
+    return;
+  }
+
   // Ignore movement & push-to-talk keys when typing in input fields
   if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
-    if (e.key === 'Escape' && customizationDrawer && customizationDrawer.classList.contains('open')) {
-      closeDrawer();
-    }
     return;
   }
 
