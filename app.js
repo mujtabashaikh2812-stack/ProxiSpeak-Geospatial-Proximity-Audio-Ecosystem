@@ -10,6 +10,14 @@
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
+const canvasWidth = canvas.width;
+const canvasHeight = canvas.height;
+const dpr = window.devicePixelRatio || 1;
+canvas.width = canvasWidth * dpr;
+canvas.height = canvasHeight * dpr;
+canvas.style.width = `${canvasWidth}px`;
+canvas.style.height = `${canvasHeight}px`;
+ctx.scale(dpr, dpr);
 const statusText = document.getElementById('statusText');
 const userList = document.getElementById('userList');
 const zoneBadge = document.getElementById('zoneBadge');
@@ -450,8 +458,8 @@ function movePlayer() {
   if (dx !== 0 || dy !== 0) {
     // Track movement direction angle
     me.facingAngle = Math.atan2(dy, dx);
-    me.x = Math.max(30, Math.min(canvas.width - 30, me.x + dx));
-    me.y = Math.max(30, Math.min(canvas.height - 30, me.y + dy));
+    me.x = Math.max(30, Math.min(canvasWidth - 30, me.x + dx));
+    me.y = Math.max(30, Math.min(canvasHeight - 30, me.y + dy));
 
     if (socket && isLiveSocket) {
       socket.emit('player:move', { x: me.x, y: me.y, facingAngle: me.facingAngle });
@@ -645,7 +653,7 @@ function drawRadarMinimap() {
   const mmH = 90;
   const margin = 14;
   const mmX = margin;
-  const mmY = canvas.height - mmH - margin;
+  const mmY = canvasHeight - mmH - margin;
   const scale = 0.12;
 
   ctx.save();
@@ -665,13 +673,13 @@ function drawRadarMinimap() {
   ctx.fillText('📡 RADAR OVERVIEW', mmX + 6, mmY + 11);
 
   // Center the scaled office bounds inside the 140x90 radar box
-  const mapOffsetX = mmX + Math.round((mmW - canvas.width * scale) / 2);
-  const mapOffsetY = mmY + Math.round((mmH - canvas.height * scale) / 2) + 2;
+  const mapOffsetX = mmX + Math.round((mmW - canvasWidth * scale) / 2);
+  const mapOffsetY = mmY + Math.round((mmH - canvasHeight * scale) / 2) + 2;
 
   // Mini office perimeter bounds
   ctx.strokeStyle = '#1e293b';
   ctx.lineWidth = 1;
-  ctx.strokeRect(mapOffsetX, mapOffsetY, canvas.width * scale, canvas.height * scale);
+  ctx.strokeRect(mapOffsetX, mapOffsetY, canvasWidth * scale, canvasHeight * scale);
 
   // 2. Draw miniature Conference Room Alpha rectangle
   const cr = ZONES.conferenceRoom;
@@ -732,22 +740,22 @@ function drawRadarMinimap() {
 }
 
 function drawScene(timestamp = 0) {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
   // 1. Office Grid Background
   ctx.strokeStyle = '#1e293b';
   ctx.lineWidth = 1;
   const step = 40;
-  for (let x = 0; x < canvas.width; x += step) {
+  for (let x = 0; x < canvasWidth; x += step) {
     ctx.beginPath();
     ctx.moveTo(x, 0);
-    ctx.lineTo(x, canvas.height);
+    ctx.lineTo(x, canvasHeight);
     ctx.stroke();
   }
-  for (let y = 0; y < canvas.height; y += step) {
+  for (let y = 0; y < canvasHeight; y += step) {
     ctx.beginPath();
     ctx.moveTo(0, y);
-    ctx.lineTo(canvas.width, y);
+    ctx.lineTo(canvasWidth, y);
     ctx.stroke();
   }
 
