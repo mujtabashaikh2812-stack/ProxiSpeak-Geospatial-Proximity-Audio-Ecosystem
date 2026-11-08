@@ -433,8 +433,12 @@ if (displayNameInput) {
 if (colorPalette) {
   colorPalette.querySelectorAll('.color-swatch').forEach((swatch) => {
     swatch.addEventListener('click', () => {
-      colorPalette.querySelectorAll('.color-swatch').forEach((s) => s.classList.remove('active'));
+      colorPalette.querySelectorAll('.color-swatch').forEach((s) => {
+        s.classList.remove('active');
+        s.setAttribute('aria-pressed', 'false');
+      });
       swatch.classList.add('active');
+      swatch.setAttribute('aria-pressed', 'true');
 
       const chosenColor = swatch.getAttribute('data-color');
       const colorName = swatch.getAttribute('data-name') || 'Custom';
