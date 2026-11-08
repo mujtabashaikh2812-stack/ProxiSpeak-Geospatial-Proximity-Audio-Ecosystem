@@ -27,6 +27,9 @@
   const eventLog = document.getElementById('event-log');
   const spotlightBanner = document.getElementById('spotlight-banner');
   const muteBtn = document.getElementById('mute-toggle-btn');
+  const benchBtn = document.getElementById('run-benchmark-btn');
+  const benchOpsLabel = document.getElementById('bench-ops-label');
+  const benchStatusLabel = document.getElementById('bench-status-label');
 
   // World and Layout Configuration
   let activeLayout = {
@@ -135,6 +138,46 @@
       `;
       occupancyList.appendChild(li);
     }
+  }
+
+  // Fetch or trigger Audio DSP benchmark
+  async function updateAudioBenchmark(triggerRun = false) {
+    try {
+      const url = triggerRun ? '/api/audio/benchmark/run' : '/api/audio/benchmark/latest';
+      const method = triggerRun ? 'POST' : 'GET';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: triggerRun ? JSON.stringify({ numAvatars: 25, iterations: 15 }) : undefined,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (benchOpsLabel && data.metrics) {
+          benchOpsLabel.textContent = `${data.metrics.opsPerSec.toLocaleString()} ops/s`;
+        }
+        if (benchStatusLabel) {
+          benchStatusLabel.textContent = data.overallRating || data.overallStatus;
+          benchStatusLabel.style.color = data.overallStatus === 'HEALTHY' ? '#4ade80' : '#f59e0b';
+        }
+        if (triggerRun && data.metrics) {
+          logEvent(`Audio Benchmark: ${data.metrics.opsPerSec.toLocaleString()} ops/s (${data.metrics.durationMs}ms)`, '#4ade80');
+        }
+      }
+    } catch (e) {
+      // Quiet fallback
+    }
+  }
+
+  if (benchBtn) {
+    benchBtn.addEventListener('click', () => {
+      benchBtn.disabled = true;
+      benchBtn.textContent = '⏳ Testing...';
+      updateAudioBenchmark(true).finally(() => {
+        benchBtn.disabled = false;
+        benchBtn.textContent = '⚡ Run Audit';
+      });
+    });
   }
 
   // Viewport Auto-fit Transform for perfect scaling on any laptop resolution
@@ -762,6 +805,7 @@
   // Initialize
   loadActiveLayout().then(() => {
     updateRoomOccupancy();
+    updateAudioBenchmark();
     requestAnimationFrame(loop);
   });
 })();

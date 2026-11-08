@@ -22,6 +22,7 @@ const { defaultLayoutPersistence } = require('./services/layoutPersistence');
 const { defaultSessionAnalytics } = require('./services/sessionAnalytics');
 const { defaultAudioBridge } = require('./services/audioBridge');
 const { defaultTelemetryMonitor } = require('./services/telemetryMonitor');
+const { defaultAudioBenchmark } = require('./services/audioBenchmark');
 
 const app = express();
 const server = http.createServer(app);
@@ -307,6 +308,27 @@ app.post('/api/telemetry/ping/:userId', (req, res) => {
   const { clientTimestamp = Date.now() - 25 } = req.body;
   const result = defaultTelemetryMonitor.recordPing(userId, clientTimestamp);
   res.status(200).json(result);
+});
+
+// Web Audio GainNode & AudioWorklet Attenuation Benchmark Endpoints (Day 17)
+app.get('/api/audio/benchmark/latest', (req, res) => {
+  res.status(200).json(defaultAudioBenchmark.getLatestBenchmark());
+});
+
+app.post('/api/audio/benchmark/run', (req, res) => {
+  const { numAvatars = 25, iterations = 15 } = req.body || {};
+  const scorecard = defaultAudioBenchmark.runFullSuite({
+    numAvatars: Number(numAvatars),
+    iterations: Number(iterations),
+  });
+  res.status(200).json(scorecard);
+});
+
+app.get('/api/audio/benchmark/history', (req, res) => {
+  res.status(200).json({
+    count: defaultAudioBenchmark.getHistory().length,
+    history: defaultAudioBenchmark.getHistory(),
+  });
 });
 
 if (require.main === module) {
