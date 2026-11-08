@@ -271,12 +271,12 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.addEventListener('keyup', (e) => {
+  keys[e.key.toLowerCase()] = false;
+  keys[e.key] = false;
+
   if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
     return;
   }
-
-  keys[e.key.toLowerCase()] = false;
-  keys[e.key] = false;
 
   // Release push-to-talk voice activity
   if (e.code === 'Space' || e.key.toLowerCase() === 'v') {
