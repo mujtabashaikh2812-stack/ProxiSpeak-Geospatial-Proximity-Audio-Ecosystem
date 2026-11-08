@@ -251,6 +251,10 @@ document.addEventListener('keydown', (e) => {
     return;
   }
 
+  if (e.key.startsWith('Arrow')) {
+    e.preventDefault();
+  }
+
   keys[e.key.toLowerCase()] = true;
   keys[e.key] = true;
 
