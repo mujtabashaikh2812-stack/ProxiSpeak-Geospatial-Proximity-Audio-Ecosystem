@@ -52,6 +52,9 @@ const colorPalette = document.getElementById('colorPalette');
 const EARSHOT_RADIUS = 100; // px
 const LERP_FACTOR = 0.2;
 const VOICE_THRESHOLD = 0.15; // Threshold for audio volume / speech activity
+const PRESENTATION_BOARD = { x: 680, y: 26, w: 180, h: 48 };
+let isPresentationBoardHovered = false;
+let presentationNoticeUntil = 0;
 
 // Local Player State
 const me = {
@@ -106,6 +109,32 @@ const coworkerListItems = new Map();
 function inRect(x, y, rect) {
   return x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
 }
+
+function getCanvasCoordinates(event) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: ((event.clientX - rect.left) / rect.width) * canvasWidth,
+    y: ((event.clientY - rect.top) / rect.height) * canvasHeight,
+  };
+}
+
+canvas.addEventListener('pointermove', (event) => {
+  const point = getCanvasCoordinates(event);
+  isPresentationBoardHovered = inRect(point.x, point.y, PRESENTATION_BOARD);
+  canvas.style.cursor = isPresentationBoardHovered ? 'pointer' : 'default';
+});
+
+canvas.addEventListener('pointerleave', () => {
+  isPresentationBoardHovered = false;
+  canvas.style.cursor = 'default';
+});
+
+canvas.addEventListener('click', (event) => {
+  const point = getCanvasCoordinates(event);
+  if (inRect(point.x, point.y, PRESENTATION_BOARD)) {
+    presentationNoticeUntil = performance.now() + 3000;
+  }
+});
 
 // Distance helper
 function distance(a, b) {
@@ -996,6 +1025,42 @@ function drawScene(timestamp = 0) {
     ctx.strokeRect(podium.x, podium.y, podium.w, podium.h);
     ctx.restore();
   }
+
+  // Interactive presentation board mounted on the wall behind the stage
+  ctx.save();
+  if (isPresentationBoardHovered) {
+    ctx.shadowColor = '#38bdf8';
+    ctx.shadowBlur = 12;
+  }
+  ctx.fillStyle = '#78350f';
+  ctx.fillRect(PRESENTATION_BOARD.x, PRESENTATION_BOARD.y, PRESENTATION_BOARD.w, PRESENTATION_BOARD.h);
+  ctx.strokeStyle = '#fbbf24';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(PRESENTATION_BOARD.x, PRESENTATION_BOARD.y, PRESENTATION_BOARD.w, PRESENTATION_BOARD.h);
+  ctx.shadowBlur = 0;
+
+  const boardInset = 5;
+  const boardX = PRESENTATION_BOARD.x + boardInset;
+  const boardY = PRESENTATION_BOARD.y + boardInset;
+  const boardW = PRESENTATION_BOARD.w - boardInset * 2;
+  const boardH = PRESENTATION_BOARD.h - boardInset * 2;
+  ctx.fillStyle = '#f8fafc';
+  ctx.fillRect(boardX, boardY, boardW, boardH);
+  ctx.strokeStyle = isPresentationBoardHovered ? '#38bdf8' : '#cbd5e1';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(boardX, boardY, boardW, boardH);
+
+  ctx.fillStyle = '#0f172a';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'bold 8px sans-serif';
+  if (timestamp < presentationNoticeUntil) {
+    ctx.fillText('Screen sharing is not available yet', boardX + boardW / 2, boardY + boardH / 2);
+  } else {
+    ctx.fillText('Click to Share Screen', boardX + boardW / 2, boardY + 13);
+    ctx.fillText('/ Slide Presentation', boardX + boardW / 2, boardY + 26);
+  }
+  ctx.restore();
 
   ctx.fillStyle = '#fde047';
   ctx.font = 'bold 13px sans-serif';
