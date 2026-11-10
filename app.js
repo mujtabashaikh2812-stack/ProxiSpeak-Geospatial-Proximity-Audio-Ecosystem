@@ -69,6 +69,7 @@ const me = {
   isOnStage: false,
   facingAngle: 0, // Direction angle in radians (East by default)
   isSpeaking: false,
+  isMuted: false,
 };
 
 // Office Zones
@@ -281,7 +282,7 @@ userList.addEventListener('click', (event) => {
   autoNavigationTargetId = autoNavigationTargetId === peerId ? null : peerId;
 });
 
-// Keyboard Input Handler (Movement + Push-to-Talk via Space or V)
+// Keyboard controls: movement, push-to-talk via Space/V, mute via M, drawer via C.
 const keys = {};
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && customizationDrawer && customizationDrawer.classList.contains('open')) {
@@ -294,6 +295,29 @@ document.addEventListener('keydown', (e) => {
     return;
   }
 
+  const shortcut = e.key.toLowerCase();
+  if (!e.repeat && shortcut === 'c') {
+    e.preventDefault();
+    if (customizationDrawer && customizationDrawer.classList.contains('open')) {
+      closeDrawer();
+    } else {
+      openDrawer();
+    }
+    return;
+  }
+
+  if (!e.repeat && shortcut === 'm') {
+    e.preventDefault();
+    me.isMuted = !me.isMuted;
+    if (me.isMuted && me.isSpeaking) {
+      me.isSpeaking = false;
+      if (socket && isLiveSocket) {
+        socket.emit('player:speaking', { userId: me.id, isSpeaking: false });
+      }
+    }
+    return;
+  }
+
   if (e.key.startsWith('Arrow')) {
     e.preventDefault();
   }
@@ -302,7 +326,7 @@ document.addEventListener('keydown', (e) => {
   keys[e.key] = true;
 
   // Push-to-talk voice activity activation
-  if (e.code === 'Space' || e.key.toLowerCase() === 'v') {
+  if (!me.isMuted && (e.code === 'Space' || shortcut === 'v')) {
     e.preventDefault();
     if (!me.isSpeaking) {
       me.isSpeaking = true;
@@ -558,7 +582,9 @@ function updateHUD() {
     statusText.textContent = '👂 Proximity Audio (≤ 100px)';
   }
 
-  if (me.isSpeaking) {
+  if (me.isMuted) {
+    statusText.textContent += ' • Push-to-talk Muted';
+  } else if (me.isSpeaking) {
     statusText.textContent += ' • 🎙️ Mic Transmitting';
   }
 

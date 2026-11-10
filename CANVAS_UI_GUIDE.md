@@ -64,6 +64,8 @@ Avatars are rendered as Canvas circles, not image sprites:
 |---|---|
 | `W` / `A` / `S` / `D` | Move up / left / down / right. |
 | `↑` / `←` / `↓` / `→` | Move up / left / down / right. |
+| `M` | Toggle app-level mute; while muted, Space/V push-to-talk is suppressed. |
+| `C` | Open the avatar customization drawer (ignored while typing in a text field). |
 | Hold `Space` or `V` | Activate push-to-talk while held; release to stop transmitting. |
 | `Escape` | Close the avatar customization drawer when it is open. |
 | Click **Customize Avatar** | Open or toggle the customization drawer. |
@@ -74,10 +76,10 @@ Avatars are rendered as Canvas circles, not image sprites:
 | Click the presentation board | Show a temporary screen-sharing-unavailable notice. |
 | Hold a virtual D-pad direction on a touch screen | Move in that direction; release to stop. |
 
-Canvas clicks do not move the avatar. There is currently no `M` mute shortcut
-or `C` drawer shortcut; those shortcuts are not implemented by the current
-keyboard handlers. The Day 20 hint `[WASD] Move | [M] Mute | [C] Color Drawer`
-should not be presented as active behavior until its controls are implemented.
+Canvas clicks do not move the avatar. The `M` shortcut suppresses the app's
+push-to-talk speaking state; it does not control an operating-system microphone
+or audio capture device. The Day 20 hint is displayed in the controls panel and
+as its hover tooltip.
 
 ## Source of truth
 
