@@ -23,6 +23,7 @@ const { defaultSessionAnalytics } = require('./services/sessionAnalytics');
 const { defaultAudioBridge } = require('./services/audioBridge');
 const { defaultTelemetryMonitor } = require('./services/telemetryMonitor');
 const { defaultAudioBenchmark } = require('./services/audioBenchmark');
+const { defaultMetricsExporter } = require('./services/metricsExporter');
 
 const app = express();
 const server = http.createServer(app);
@@ -331,10 +332,22 @@ app.get('/api/audio/benchmark/history', (req, res) => {
   });
 });
 
+// Prometheus & OpenMetrics Plaintext Scraper Endpoint (Day 19 Observability)
+app.get('/metrics', (req, res) => {
+  res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+  res.status(200).send(defaultMetricsExporter.generatePrometheusMetrics());
+});
+
+// JSON Telemetry Snapshot for dashboards & health monitors
+app.get('/api/metrics/json', (req, res) => {
+  res.status(200).json(defaultMetricsExporter.collectMetrics());
+});
+
 if (require.main === module) {
   server.listen(config.port, () => {
     console.log(`[ProxiSpeak Server] Running on http://localhost:${config.port}`);
     console.log(`[ProxiSpeak Server] Visual Playground: http://localhost:${config.port}/`);
+    console.log(`[ProxiSpeak Server] Prometheus Metrics: http://localhost:${config.port}/metrics`);
     console.log(`[ProxiSpeak Server] Earshot radius: ${EARSHOT_RADIUS}px`);
     console.log(`[ProxiSpeak Server] Movement throttle active: 30Hz tick rate`);
   });
