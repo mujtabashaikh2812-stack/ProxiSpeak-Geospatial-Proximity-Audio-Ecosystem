@@ -48,6 +48,40 @@ const previewNameLabel = document.getElementById('previewNameLabel');
 const activeColorName = document.getElementById('activeColorName');
 const colorPalette = document.getElementById('colorPalette');
 
+const AVATAR_PREFERENCES_KEY = 'proxispeak.avatarPreferences';
+const DEFAULT_AVATAR_NAME = 'You (Akhila)';
+const DEFAULT_AVATAR_COLOR = '#38bdf8';
+const AVATAR_COLORS = new Set(['#38bdf8', '#10b981', '#a855f7', '#f59e0b', '#f43f5e']);
+
+function loadAvatarPreferences() {
+  try {
+    const stored = window.localStorage.getItem(AVATAR_PREFERENCES_KEY);
+    const preferences = stored ? JSON.parse(stored) : {};
+    return {
+      name: typeof preferences.name === 'string' && preferences.name.trim()
+        ? preferences.name.trim().slice(0, 26)
+        : DEFAULT_AVATAR_NAME,
+      color: AVATAR_COLORS.has(preferences.color) ? preferences.color : DEFAULT_AVATAR_COLOR,
+    };
+  } catch (error) {
+    console.error('Unable to load avatar preferences from local storage.', error);
+    return { name: DEFAULT_AVATAR_NAME, color: DEFAULT_AVATAR_COLOR };
+  }
+}
+
+function saveAvatarPreferences() {
+  try {
+    window.localStorage.setItem(AVATAR_PREFERENCES_KEY, JSON.stringify({
+      name: me.name,
+      color: me.color,
+    }));
+  } catch (error) {
+    console.error('Unable to save avatar preferences to local storage.', error);
+  }
+}
+
+const savedAvatarPreferences = loadAvatarPreferences();
+
 // Proximity & Spatial constants
 const EARSHOT_RADIUS = 100; // px
 const LERP_FACTOR = 0.2;
@@ -59,11 +93,11 @@ let presentationNoticeUntil = 0;
 // Local Player State
 const me = {
   id: 'me-' + Math.floor(1000 + Math.random() * 9000),
-  name: 'You (Akhila)',
+  name: savedAvatarPreferences.name,
   x: 220,
   y: 260,
   radius: 14,
-  color: '#38bdf8',
+  color: savedAvatarPreferences.color,
   speed: 4,
   zone: 'open',
   isOnStage: false,
@@ -470,12 +504,17 @@ if (drawerOverlay) {
 
 // Display Name & Role Input Handler
 if (displayNameInput) {
+  displayNameInput.value = me.name;
+  if (previewNameLabel) {
+    previewNameLabel.textContent = me.name;
+  }
   displayNameInput.addEventListener('input', (e) => {
     const val = e.target.value.trim();
-    me.name = val || 'You (Akhila)';
+    me.name = val || DEFAULT_AVATAR_NAME;
     if (previewNameLabel) {
       previewNameLabel.textContent = me.name;
     }
+    saveAvatarPreferences();
     if (socket && isLiveSocket) {
       socket.emit('player:update', { userId: me.id, displayName: me.name, color: me.color });
     }
@@ -484,6 +523,18 @@ if (displayNameInput) {
 
 // Color Palette Swatches Handler (Sky Blue, Emerald Green, Purple, Amber, Rose Pink)
 if (colorPalette) {
+  colorPalette.querySelectorAll('.color-swatch').forEach((swatch) => {
+    const isSelected = swatch.getAttribute('data-color') === me.color;
+    swatch.classList.toggle('active', isSelected);
+    swatch.setAttribute('aria-pressed', String(isSelected));
+    if (isSelected && activeColorName) {
+      activeColorName.textContent = `Selected: ${swatch.getAttribute('data-name') || 'Custom'}`;
+    }
+  });
+  if (avatarPreviewCircle) {
+    avatarPreviewCircle.style.background = me.color;
+  }
+
   colorPalette.querySelectorAll('.color-swatch').forEach((swatch) => {
     swatch.addEventListener('click', () => {
       colorPalette.querySelectorAll('.color-swatch').forEach((s) => {
@@ -503,6 +554,7 @@ if (colorPalette) {
       if (activeColorName) {
         activeColorName.textContent = `Selected: ${colorName}`;
       }
+      saveAvatarPreferences();
 
       if (socket && isLiveSocket) {
         socket.emit('player:update', { userId: me.id, displayName: me.name, color: me.color });
