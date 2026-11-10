@@ -70,6 +70,9 @@ export default function SpatialAudioDemo() {
     socket.onAny(onIn);
     socket.onAnyOutgoing(onOut);
     socket.connect();
+    const onError = (err) => addLog(`✖ ${err.message}`);
+socket.on('connect_error', onError);
+
 
     return () => {
       socket.off('connect', onConnect);
