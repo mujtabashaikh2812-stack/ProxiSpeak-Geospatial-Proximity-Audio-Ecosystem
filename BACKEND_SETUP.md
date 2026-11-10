@@ -2,6 +2,7 @@ ProxiSpeak Backend Setup
 ========================
 
 This document covers the Week 1 and Week 2 database work for the dev-kuldeep branch.
+For the schemas, indexes, query reference and measured figures see DATABASE_ARCHITECTURE.md.
 
 1. Environment variables
 -------------------------
