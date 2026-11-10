@@ -89,3 +89,7 @@ Coordinate sanitization: room bounds 0 to 1200 by 0 to 800, distinct from MAX_CA
 ## Index migration
 
 Users now carry a status field (online, idle, offline; default offline) and a compound index { status: 1, location: '2dsphere' } for queries that filter by status and then search by distance. Status was added because it did not exist and the compound index needs it as its leading key. The single field location index is kept by default. Commands: node scripts/migrateIndexes.js, node scripts/migrateIndexes.js --memory and node scripts/migrateIndexes.js --dropLegacy. The drop flag is opt in because proximity queries that do not filter status still rely on the single field index.
+
+## User profile API
+
+routes/userRoutes.js adds GET /api/db/users/:id (getUserProfile) and PUT /api/db/users/:id/avatar (updateUserAvatar), where :id is the User userId string and the Mongo _id is only a fallback when the string is a valid ObjectId. User gains three optional fields: avatarColor (hash plus six hex digits, default null), shirtSpriteId (at most 64 characters, default null) and statusMessage (at most 140 characters, default empty). A blank id, an empty payload, a bad colour or an over long text field returns 400 naming the field; an unknown user returns 404. getProfilesForUsers(userIds) is the batch call for the roster: at most 100 ids, returns { count, users } sorted by userId. The handlers are framework free and mount on the lead's Express server through registerUserRoutes without edits.

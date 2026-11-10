@@ -263,3 +263,16 @@ The run prints one PASS or FAIL line each for: error count is zero, all requeste
 When MONGODB_URI is not set, the test starts a temporary in-memory MongoDB by default and drops its database at the end, so it runs on any machine with no Docker and no installed MongoDB. If MONGODB_URI is set and --memory is not given, the avatars are written under the prefix loadtest:avatar: and removed afterwards; production looking URIs are refused.
 
 The figures are from an in-memory single node database on the same machine and are not a production network number; a networked figure needs the Docker container in docker-compose.mongo.yml.
+
+## User profile API
+
+routes/userRoutes.js holds the profile and avatar handlers. They are framework free in the same way as routes/zoneRoutes.js: each function returns a plain { status, body } object and never throws. The :id in the paths is the User userId string, the business key of the schema. Only when no user has that userId and the string is a valid 24 character ObjectId is the Mongo _id tried as a fallback.
+
+New optional fields on User: avatarColor (hex colour, a hash followed by six hexadecimal digits, default null), shirtSpriteId (string, at most 64 characters, default null) and statusMessage (string, at most 140 characters, default empty). Existing fields and both indexes are unchanged.
+
+- GET /api/db/users/:id calls getUserProfile(userId). Returns 200 with { user } holding userId, displayName, avatarColor, shirtSpriteId, statusMessage, status, canvasX, canvasY and lastSeenAt. A blank or non string id returns 400. An unknown user returns 404.
+- PUT /api/db/users/:id/avatar calls updateUserAvatar(userId, payload). The payload may hold any combination of avatarColor, shirtSpriteId and statusMessage and must hold at least one, otherwise 400. A colour that is not a hex colour, a status message over 140 characters or a shirt sprite id over 64 characters returns 400 naming the field, before the database is touched. An unknown user returns 404. A database error returns a 500 result object and is never thrown. Success returns 200 with { user } in the same shape as the GET.
+- getProfilesForUsers(userIds) is the batch call for the roster. It takes an array of at most 100 userId strings, returns 200 with { count, users } sorted by userId, and returns 400 for a non array or more than 100 entries.
+- registerUserRoutes(app, basePath) mounts the GET and PUT paths on an Express like app. The default base path is /api/db/users. It throws a clear error when the argument has no get and put methods.
+
+Tests: node --test tests/userRoutes.test.js. The numbered harness npm run verify:db covers this API as Check 15.

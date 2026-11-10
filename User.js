@@ -80,6 +80,28 @@ const UserSchema = new mongoose.Schema(
       default: 'offline',
       trim: true,
     },
+    // Profile customization fields exposed by the Day 17 route file (routes/userRoutes.js).
+    avatarColor: {
+      type: String,
+      trim: true,
+      default: null,
+      validate: {
+        validator: (value) => value === null || value === undefined || /^#[0-9a-fA-F]{6}$/.test(value),
+        message: 'avatarColor must be a hex colour: a hash followed by six hexadecimal digits, for example #1a2b3c',
+      },
+    },
+    shirtSpriteId: {
+      type: String,
+      trim: true,
+      maxlength: 64,
+      default: null,
+    },
+    statusMessage: {
+      type: String,
+      trim: true,
+      maxlength: 140,
+      default: '',
+    },
   },
   { strict: true }
 );

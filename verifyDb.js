@@ -14,6 +14,7 @@ const { UserSession } = require('./models/UserSession');
 const { findUsersNearCanvasPointCached, findUsersNearCanvasPointGuarded } = require('./proximityService');
 const { createNearbyCacheBridge } = require('./services/nearbyCacheBridge');
 const { sanitizeGeoJSONPoint } = require('./middleware/validateCoordinates');
+const { getUserProfile, updateUserAvatar, getProfilesForUsers } = require('./routes/userRoutes');
 
 const QUERY_CENTRE_X = 500;
 const QUERY_CENTRE_Y = 500;
@@ -348,6 +349,32 @@ const seedResult1 = await runSeed();
     record('Check 13: compound status and 2dsphere index', check14Ok,
       'declared=' + declared + ' winningIndex=' + cmpIndexName + ' keysExamined=' + cmpExplain.executionStats.totalKeysExamined +
       ' docsExamined=' + cmpExplain.executionStats.totalDocsExamined + ' legacyStillListed=' + legacyStillListed);
+    await User.deleteMany({});
+
+    // ---- Check 15: user profile avatar persistence ----
+    const profileUserId = 'profile:check15';
+    const [profLng, profLat] = canvasToGeoJSON(QUERY_CENTRE_X, QUERY_CENTRE_Y);
+    await User.create({
+      userId: profileUserId,
+      displayName: 'Profile Check',
+      location: { type: 'Point', coordinates: [profLng, profLat] },
+      canvasX: QUERY_CENTRE_X,
+      canvasY: QUERY_CENTRE_Y,
+    });
+    const profUpdate = await updateUserAvatar(profileUserId, { avatarColor: '#3366cc', statusMessage: 'working from the east wing' });
+    const profUpdateOk = profUpdate.status === 200 &&
+      profUpdate.body.user.avatarColor === '#3366cc' &&
+      profUpdate.body.user.statusMessage === 'working from the east wing';
+    const profRead = await getUserProfile(profileUserId);
+    const profReadOk = profRead.status === 200 &&
+      profRead.body.user.avatarColor === '#3366cc' &&
+      profRead.body.user.statusMessage === 'working from the east wing';
+    const profBad = await updateUserAvatar(profileUserId, { avatarColor: 'red' });
+    const profBatch = await getProfilesForUsers([profileUserId]);
+    const profBatchOk = profBatch.status === 200 && profBatch.body.count === 1 &&
+      profBatch.body.users[0].userId === profileUserId;
+    record('Check 15: user profile avatar persistence', profUpdateOk && profReadOk && profBad.status === 400 && profBatchOk,
+      'update=' + profUpdate.status + ' read=' + profRead.status + ' invalidColour=' + profBad.status + ' batch=' + profBatch.status + '/' + profBatch.body.count);
     await User.deleteMany({});
 
     // ---- Check 14: cleanup ----
