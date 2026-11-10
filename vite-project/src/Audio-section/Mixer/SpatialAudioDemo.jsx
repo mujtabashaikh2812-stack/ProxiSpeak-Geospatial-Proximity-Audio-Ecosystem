@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getAudioContext, resumeAudioContext } from '../AudioContext';
 import { useSpatialAudio } from './useSpatialAudio';
-import { distanceBetween, volumeForDistance, EARSHOT_RADIUS } from './Distancevolume';
+import { distanceBetween, volumeForDistance, EARSHOT_RADIUS } from './distancevolume';
 import { hasLineOfSight } from '../Mixer/Occulution';
+import { socket } from '../Socket';
 
 const W = 400;
 const H = 300;
@@ -43,12 +44,45 @@ export default function SpatialAudioDemo() {
   const [wallOn, setWallOn] = useState(false);
   const areaRef = useRef(null);
 
+  const [connected, setConnected] = useState(false);
+  const [socketId, setSocketId] = useState('');
+  const [log, setLog] = useState([]);
+
   const remoteStreams = useMemo(() => (fake ? { fake: fake.stream } : {}), [fake]);
   const peerPositions = useMemo(() => ({ fake: peerPos }), [peerPos]);
   const walls = useMemo(() => (wallOn ? [WALL] : []), [wallOn]);
   const { speakingIds } = useSpatialAudio({ remoteStreams, myPosition: ME, peerPositions, walls });
 
   useEffect(() => () => fakeRef.current?.stop(), []);
+
+  useEffect(() => {
+    const addLog = (line) => setLog((l) => [line, ...l].slice(0, 8));
+    const onConnect = () => {
+      setConnected(true);
+      setSocketId(socket.id);
+    };
+    const onDisconnect = () => setConnected(false);
+    const onIn = (event, ...args) => addLog(`← ${event} ${JSON.stringify(args)}`);
+    const onOut = (event, ...args) => addLog(`→ ${event} ${JSON.stringify(args)}`);
+
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
+    socket.onAny(onIn);
+    socket.onAnyOutgoing(onOut);
+    socket.connect();
+
+    return () => {
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
+      socket.offAny(onIn);
+      socket.offAnyOutgoing(onOut);
+      socket.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (socket.connected) socket.emit('move', peerPos); // replace 'move' with the event name in server.js
+  }, [peerPos]);
 
   async function start() {
     await resumeAudioContext();
@@ -117,6 +151,13 @@ export default function SpatialAudioDemo() {
         <p>Distance: {Math.round(distance)} px</p>
         <p>Volume: {Math.round(volume * 100)}%{occluded ? ' (muffled by wall)' : ''}</p>
         <p>Speaking: {speakingIds.includes('fake') ? 'yes' : 'no'}</p>
+        <p className={connected ? 'text-emerald-400' : 'text-red-400'}>
+          Backend: {connected ? `Connected (${socketId})` : 'Disconnected'}
+        </p>
+      </div>
+
+      <div className="max-h-36 w-full max-w-md overflow-auto rounded bg-slate-800 p-2 font-mono text-xs text-slate-200">
+        {log.length ? log.map((l, i) => <p key={i}>{l}</p>) : <p>No socket events yet</p>}
       </div>
 
       <div className="flex gap-3">
