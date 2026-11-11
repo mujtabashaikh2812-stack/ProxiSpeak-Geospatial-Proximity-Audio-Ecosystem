@@ -24,6 +24,7 @@ const { defaultAudioBridge } = require('./services/audioBridge');
 const { defaultTelemetryMonitor } = require('./services/telemetryMonitor');
 const { defaultAudioBenchmark } = require('./services/audioBenchmark');
 const { defaultMetricsExporter } = require('./services/metricsExporter');
+const { defaultReleaseCoordinator } = require('./services/releaseCoordinator');
 
 const app = express();
 const server = http.createServer(app);
@@ -343,11 +344,22 @@ app.get('/api/metrics/json', (req, res) => {
   res.status(200).json(defaultMetricsExporter.collectMetrics());
 });
 
+// Final Release v1.0.0 Ecosystem Verification Gateway (Day 20 Grand Finale)
+app.get('/api/system/release', async (req, res) => {
+  try {
+    const report = await defaultReleaseCoordinator.evaluateReleaseReadiness();
+    res.status(200).json(report);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to evaluate release readiness', details: err.message });
+  }
+});
+
 if (require.main === module) {
   server.listen(config.port, () => {
     console.log(`[ProxiSpeak Server] Running on http://localhost:${config.port}`);
     console.log(`[ProxiSpeak Server] Visual Playground: http://localhost:${config.port}/`);
     console.log(`[ProxiSpeak Server] Prometheus Metrics: http://localhost:${config.port}/metrics`);
+    console.log(`[ProxiSpeak Server] Release Manifest: http://localhost:${config.port}/api/system/release`);
     console.log(`[ProxiSpeak Server] Earshot radius: ${EARSHOT_RADIUS}px`);
     console.log(`[ProxiSpeak Server] Movement throttle active: 30Hz tick rate`);
   });
