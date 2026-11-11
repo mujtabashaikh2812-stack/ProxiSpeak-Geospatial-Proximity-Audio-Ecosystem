@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ProxiSpeak - 2D Virtual Office Proximity Demo</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Socket.io client (auto-provided when served by Express backend) -->
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <div class="app">
+    <!-- Left Navigation & Status Panel -->
+    <aside class="panel">
+      <div class="header-group">
+        <div class="brand">
+          <span class="brand-badge">Infotact Group 3</span>
+          <h1>ProxiSpeak</h1>
+        </div>
+        <p class="subtitle">Geospatial Proximity Audio Ecosystem</p>
+      </div>
+
+      <!-- Avatar Customization Drawer Trigger Button -->
+      <button id="drawerToggleBtn" class="drawer-toggle-btn" type="button">
+        <span class="btn-icon">🎨</span> Customize Avatar
+      </button>
+
+      <div class="status-card">
+        <div class="status-row">
+          <span class="status-label">Current Zone:</span>
+          <span id="zoneBadge" class="zone-badge badge-open">Open Workspace</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">Audio Status:</span>
+          <span id="statusText" class="audio-status">Whisper Proximity (&le; 100px)</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">Coordinates:</span>
+          <span id="coordsDisplay" class="coords-text">(220, 260)</span>
+        </div>
+      </div>
+
+      <div class="peers-section">
+        <div class="section-title-row">
+          <h2>Nearby Coworkers</h2>
+          <span id="peerCountBadge" class="count-pill">0 Online</span>
+        </div>
+        <ul id="userList" class="user-list" aria-label="Coworkers and their distances">
+          <li class="empty-state">Looking for coworkers nearby...</li>
+        </ul>
+      </div>
+
+      <div class="legend-card">
+        <h3>Office Map Key</h3>
+        <div class="legend-item"><span class="legend-box box-room"></span> Conference Room Alpha (Soundproof)</div>
+        <div class="legend-item"><span class="legend-box box-podium"></span> Town Hall Stage (100% Broadcast)</div>
+        <div class="legend-item"><span class="legend-box box-earshot"></span> 100px Audio Earshot Boundary</div>
+      </div>
+
+      <div class="controls-hint" title="[WASD] Move | [M] Mute | [C] Color Drawer">
+        <span>Controls:</span> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>&uarr;</kbd><kbd>&larr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd> to walk
+        <span class="shortcut-hint">[WASD] Move | [M] Mute | [C] Color Drawer</span>
+      </div>
+    </aside>
+
+    <!-- Right Interactive HTML5 Canvas Viewport -->
+    <main class="viewport">
+      <div id="spotlightAlert" class="spotlight-banner">🎙️ Town Hall Stage Active: Broadcasting voice to entire office!</div>
+      <canvas id="canvas" width="980" height="620" tabindex="-1"></canvas>
+      <div class="virtual-dpad" aria-label="Touch movement controls">
+        <button class="virtual-control virtual-control-up" type="button" data-key="w" aria-label="Move up" aria-pressed="false">&#9650;</button>
+        <button class="virtual-control virtual-control-left" type="button" data-key="a" aria-label="Move left" aria-pressed="false">&#9664;</button>
+        <button class="virtual-control virtual-control-down" type="button" data-key="s" aria-label="Move down" aria-pressed="false">&#9660;</button>
+        <button class="virtual-control virtual-control-right" type="button" data-key="d" aria-label="Move right" aria-pressed="false">&#9654;</button>
+      </div>
+    </main>
+  </div>
+
+  <!-- Collapsible Slide-Out Avatar Customization Drawer -->
+  <aside id="customizationDrawer" class="customization-drawer" aria-hidden="true">
+    <div class="drawer-header">
+      <div class="drawer-title-group">
+        <span class="drawer-icon">🎨</span>
+        <h3>Customize Avatar</h3>
+      </div>
+      <button id="drawerCloseBtn" class="drawer-close-btn" type="button" aria-label="Close drawer">&times;</button>
+    </div>
+
+    <div class="drawer-body">
+      <!-- Live Avatar Preview Card -->
+      <div class="custom-preview-card">
+        <div id="avatarPreviewCircle" class="avatar-preview-circle">
+          <div class="preview-eyes">
+            <span class="preview-pupil"></span>
+            <span class="preview-pupil"></span>
+          </div>
+        </div>
+        <div class="preview-meta">
+          <span id="previewNameLabel" class="preview-name-label">You (Akhila)</span>
+          <span class="preview-sub">Live Avatar Preview</span>
+        </div>
+      </div>
+
+      <!-- Display Name & Role Input -->
+      <div class="drawer-field">
+        <label for="displayNameInput">Display Name & Role Title</label>
+        <input 
+          type="text" 
+          id="displayNameInput" 
+          class="drawer-input" 
+          placeholder="e.g. Akhila (Lead)" 
+          value="You (Akhila)"
+          maxlength="26"
+          autocomplete="off"
+        />
+        <span class="field-hint">Updates your overhead name tag in real time</span>
+      </div>
+
+      <!-- Color Palette Picker -->
+      <div class="drawer-field">
+        <label>Avatar Color Palette</label>
+        <div class="color-palette" id="colorPalette">
+          <button type="button" class="color-swatch active" data-color="#38bdf8" data-name="Sky Blue" title="Sky Blue" aria-label="Sky Blue avatar color" aria-pressed="true" style="--swatch-color: #38bdf8;"></button>
+          <button type="button" class="color-swatch" data-color="#10b981" data-name="Emerald Green" title="Emerald Green" aria-label="Emerald Green avatar color" aria-pressed="false" style="--swatch-color: #10b981;"></button>
+          <button type="button" class="color-swatch" data-color="#a855f7" data-name="Purple" title="Purple" aria-label="Purple avatar color" aria-pressed="false" style="--swatch-color: #a855f7;"></button>
+          <button type="button" class="color-swatch" data-color="#f59e0b" data-name="Amber" title="Amber" aria-label="Amber avatar color" aria-pressed="false" style="--swatch-color: #f59e0b;"></button>
+          <button type="button" class="color-swatch" data-color="#f43f5e" data-name="Rose Pink" title="Rose Pink" aria-label="Rose Pink avatar color" aria-pressed="false" style="--swatch-color: #f43f5e;"></button>
+        </div>
+        <div id="activeColorName" class="color-name-display">Selected: Sky Blue</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Drawer Backdrop Overlay -->
+  <div id="drawerOverlay" class="drawer-overlay"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

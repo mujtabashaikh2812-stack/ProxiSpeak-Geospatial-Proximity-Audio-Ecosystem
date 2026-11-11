@@ -108,3 +108,6 @@ The **Node.js** backend continuously evaluates spatial relationships using **Mon
 git clone https://github.com/mujtabashaikh2812-stack/ProxiSpeak-Geospatial-Proximity-Audio-Ecosystem.git
 cd ProxiSpeak-Geospatial-Proximity-Audio-Ecosystem
 ```
+
+Avatar display names and palette colors are saved in the current browser, so your
+customization is restored when you return to the demo.
