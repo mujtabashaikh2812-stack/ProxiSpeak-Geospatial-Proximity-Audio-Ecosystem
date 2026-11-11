@@ -212,6 +212,20 @@
     myAvatar.targetY = (rawY - viewTransform.offsetY) / viewTransform.scale;
   });
 
+  // Touch-to-move and drag navigation for mobile devices
+  function handleCanvasTouch(e) {
+    if (!e.touches || e.touches.length === 0) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const rawX = touch.clientX - rect.left;
+    const rawY = touch.clientY - rect.top;
+    myAvatar.targetX = (rawX - viewTransform.offsetX) / viewTransform.scale;
+    myAvatar.targetY = (rawY - viewTransform.offsetY) / viewTransform.scale;
+  }
+  canvas.addEventListener('touchstart', handleCanvasTouch, { passive: false });
+  canvas.addEventListener('touchmove', handleCanvasTouch, { passive: false });
+
   // ==========================================
   // WebRTC Real-Time Spatial Voice Mesh Engine
   // ==========================================
