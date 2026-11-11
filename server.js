@@ -52,6 +52,11 @@ app.use(express.urlencoded({ extended: true }));
 // Serve static frontend visual test playground
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Serve custom high-visibility SVG favicon for /favicon.ico requests
+app.get('/favicon.ico', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'favicon.svg'));
+});
+
 // Serve Akhila's 2D canvas client demo
 app.use('/akhila', express.static(path.join(__dirname, 'client-akhila')));
 
