@@ -1,0 +1,35 @@
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: proxispeak-mongo
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=procsispeak
+    volumes:
+      - proxispeak-mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+  seeder:
+    # Exists only for local development. Guarded by SEED_DB. Runs once when mongo becomes healthy.
+    image: node:18-alpine
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: "no"
+    working_dir: /app
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/procsispeak
+      - SEED_DB=development
+    command: sh -c "npm install --omit=dev && npm run seed"
+
+volumes:
+  proxispeak-mongo-data:

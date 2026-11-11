@@ -1,15 +1,27 @@
 {
   "name": "proxispeak-geospatial-proximity-audio-ecosystem",
   "version": "1.0.0",
-  "description": "ProxiSpeak backend: real-time signaling server, geospatial proximity engine, and WebRTC audio coordinator.",
+  "description": "ProxiSpeak: Geospatial Proximity Audio Ecosystem with real-time 2D spatial engine, WebRTC voice mesh, and MongoDB spatial persistence.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test",
+    "test:unit": "node --test tests/unit.test.js",
+    "seed": "node seed.js",
+    "seed:zones": "node scripts/seedZones.js",
+    "demo": "node queryDemo.js",
+    "benchmark": "node benchmark.js",
+    "loadtest": "node benchmark/loadTest.js",
+    "verify:db": "node verifyDb.js",
+    "migrate:indexes": "node scripts/migrateIndexes.js",
     "docker:build": "docker build -t proxispeak-server:1.0.0 .",
     "docker:up": "docker compose -f docker-compose.prod.yml up -d",
     "docker:down": "docker compose -f docker-compose.prod.yml down"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mujtabashaikh2812-stack/ProxiSpeak-Geospatial-Proximity-Audio-Ecosystem.git"
   },
   "keywords": [
     "webrtc",
@@ -17,7 +29,8 @@
     "spatial-audio",
     "geospatial",
     "mongodb",
-    "proximity"
+    "proximity",
+    "redis"
   ],
   "author": "Mujtaba Shaikh <Infotact Group 3>",
   "license": "ISC",
@@ -28,5 +41,8 @@
     "express": "^4.21.2",
     "mongoose": "^8.9.5",
     "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^11.3.0"
   }
 }
