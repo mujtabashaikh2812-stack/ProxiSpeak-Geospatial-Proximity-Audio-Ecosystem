@@ -56,7 +56,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/akhila', express.static(path.join(__dirname, 'client-akhila')));
 
 // Health check endpoint for monitoring & uptime checks
-app.get('/api/health', (req, res) => {
+const healthCheckHandler = (req, res) => {
   res.status(200).json({
     status: 'online',
     timestamp: new Date().toISOString(),
@@ -66,7 +66,9 @@ app.get('/api/health', (req, res) => {
     zonesCount: OFFICE_ZONES.length,
     service: 'ProxiSpeak Signaling Server',
   });
-});
+};
+app.get('/api/health', healthCheckHandler);
+app.get('/healthz', healthCheckHandler);
 
 // Redis pub/sub cluster health & resilience diagnostics (Week 3 Scaling)
 app.get('/api/health/redis', async (req, res) => {
