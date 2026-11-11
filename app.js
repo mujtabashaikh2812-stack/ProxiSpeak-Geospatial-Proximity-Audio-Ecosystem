@@ -390,9 +390,9 @@ document.addEventListener('keyup', (e) => {
   }
 });
 
-// Virtual D-pad forwards touch holds through the existing keyboard movement handler.
+// Virtual D-pad forwards held pointer and keyboard input through the movement handler.
 const virtualControls = document.querySelectorAll('.virtual-control');
-const activeTouchesByControl = new Map();
+const activeInputsByControl = new Map();
 
 function dispatchMovementKey(type, key) {
   const code = `Key${key.toUpperCase()}`;
@@ -404,47 +404,57 @@ function dispatchMovementKey(type, key) {
   }));
 }
 
-function releaseVirtualControl(button, key) {
-  const activeTouches = activeTouchesByControl.get(button);
-  if (!activeTouches || activeTouches.size === 0) return;
+function activateVirtualControl(button, inputId, key) {
+  const activeInputs = activeInputsByControl.get(button);
+  if (!activeInputs || activeInputs.has(inputId)) return;
 
-  activeTouches.clear();
+  const wasInactive = activeInputs.size === 0;
+  activeInputs.add(inputId);
+  if (wasInactive) {
+    button.setAttribute('aria-pressed', 'true');
+    dispatchMovementKey('keydown', key);
+  }
+}
+
+function releaseVirtualControl(button, inputId, key) {
+  const activeInputs = activeInputsByControl.get(button);
+  if (!activeInputs || !activeInputs.delete(inputId) || activeInputs.size > 0) return;
+
   button.setAttribute('aria-pressed', 'false');
   dispatchMovementKey('keyup', key);
 }
 
 virtualControls.forEach((button) => {
   const key = button.dataset.key;
-  const activeTouches = new Set();
-  activeTouchesByControl.set(button, activeTouches);
+  activeInputsByControl.set(button, new Set());
 
-  button.addEventListener('touchstart', (event) => {
+  button.addEventListener('pointerdown', (event) => {
     event.preventDefault();
-    const wasInactive = activeTouches.size === 0;
-    for (const touch of event.changedTouches) {
-      activeTouches.add(touch.identifier);
-    }
+    button.setPointerCapture(event.pointerId);
+    activateVirtualControl(button, `pointer-${event.pointerId}`, key);
+  });
 
-    if (wasInactive && activeTouches.size > 0) {
-      button.setAttribute('aria-pressed', 'true');
-      dispatchMovementKey('keydown', key);
-    }
-  }, { passive: false });
-
-  const endTouch = (event) => {
-    event.preventDefault();
-    for (const touch of event.changedTouches) {
-      activeTouches.delete(touch.identifier);
-    }
-
-    if (activeTouches.size === 0) {
-      button.setAttribute('aria-pressed', 'false');
-      dispatchMovementKey('keyup', key);
-    }
+  const endPointer = (event) => {
+    releaseVirtualControl(button, `pointer-${event.pointerId}`, key);
   };
+  button.addEventListener('pointerup', endPointer);
+  button.addEventListener('pointercancel', endPointer);
 
-  button.addEventListener('touchend', endTouch, { passive: false });
-  button.addEventListener('touchcancel', endTouch, { passive: false });
+  button.addEventListener('keydown', (event) => {
+    if (event.key !== ' ' && event.key !== 'Enter') return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (!event.repeat) {
+      activateVirtualControl(button, `keyboard-${event.code}`, key);
+    }
+  });
+
+  button.addEventListener('keyup', (event) => {
+    if (event.key !== ' ' && event.key !== 'Enter') return;
+    event.preventDefault();
+    event.stopPropagation();
+    releaseVirtualControl(button, `keyboard-${event.code}`, key);
+  });
 });
 
 window.addEventListener('blur', () => {
@@ -460,7 +470,11 @@ window.addEventListener('blur', () => {
   }
 
   virtualControls.forEach((button) => {
-    releaseVirtualControl(button, button.dataset.key);
+    const activeInputs = activeInputsByControl.get(button);
+    if (!activeInputs || activeInputs.size === 0) return;
+    activeInputs.clear();
+    button.setAttribute('aria-pressed', 'false');
+    dispatchMovementKey('keyup', button.dataset.key);
   });
 });
 
