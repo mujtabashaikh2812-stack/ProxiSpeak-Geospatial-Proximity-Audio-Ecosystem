@@ -212,12 +212,258 @@
     myAvatar.targetY = (rawY - viewTransform.offsetY) / viewTransform.scale;
   });
 
-  // Mute button toggle
+  // ==========================================
+  // WebRTC Real-Time Spatial Voice Mesh Engine
+  // ==========================================
+  const RTC_CONFIG = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun.cloudflare.com:3478' },
+    ],
+  };
+
+  let localMediaStream = null;
+  let audioCtx = null;
+  let isVoiceEnabled = false;
+
+  // Active Peer Voice Connections: Map<peerId, { pc, gainNode, pannerNode, audioEl }>
+  const peerConnections = new Map();
+
+  function getAudioContext() {
+    if (!audioCtx) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        audioCtx = new AudioContextClass();
+      }
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    return audioCtx;
+  }
+
+  // Request Microphone Access & Initialize Web Audio API
+  async function enableVoiceStreaming() {
+    try {
+      getAudioContext();
+      localMediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+        video: false,
+      });
+
+      isVoiceEnabled = true;
+      myAvatar.isMuted = false;
+
+      if (muteBtn) {
+        muteBtn.textContent = '🎙️ Mic Active (Click to Mute)';
+        muteBtn.classList.remove('active');
+        muteBtn.style.background = '#16a34a'; // green
+      }
+
+      logEvent('Microphone activated! Live spatial voice connected.', '#22c55e');
+
+      // Add local audio tracks to any existing connections
+      peerConnections.forEach((conn) => {
+        if (conn.pc && localMediaStream) {
+          localMediaStream.getAudioTracks().forEach((track) => {
+            conn.pc.addTrack(track, localMediaStream);
+          });
+        }
+      });
+
+      // Connect to any peers currently within 100px earshot
+      audiblePeers.forEach((p, peerId) => {
+        initiatePeerConnectionIfNeeded(peerId);
+      });
+
+      return true;
+    } catch (err) {
+      console.warn('Microphone access denied or unavailable:', err);
+      logEvent('Microphone access denied: ' + (err.message || 'Check browser permissions'), '#ef4444');
+      if (muteBtn) {
+        muteBtn.textContent = '⚠️ Mic Denied (Click to Retry)';
+        muteBtn.style.background = '#dc2626';
+      }
+      return false;
+    }
+  }
+
+  // Set up spatial audio processing graph for remote peer voice
+  function setupRemoteAudioGraph(peerId, remoteStream) {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    let audioEl = document.getElementById(`remote-audio-${peerId}`);
+    if (!audioEl) {
+      audioEl = document.createElement('audio');
+      audioEl.id = `remote-audio-${peerId}`;
+      audioEl.autoplay = true;
+      audioEl.playsInline = true;
+      document.body.appendChild(audioEl);
+    }
+    audioEl.srcObject = remoteStream;
+
+    let gainNode = null;
+    let pannerNode = null;
+
+    try {
+      const source = ctx.createMediaStreamSource(remoteStream);
+      gainNode = ctx.createGain();
+
+      if (ctx.createStereoPanner) {
+        pannerNode = ctx.createStereoPanner();
+        source.connect(gainNode);
+        gainNode.connect(pannerNode);
+        pannerNode.connect(ctx.destination);
+      } else {
+        source.connect(gainNode);
+        gainNode.connect(ctx.destination);
+      }
+
+      const p = audiblePeers.get(peerId);
+      const initialGain = p && typeof p.effectiveVolume === 'number' ? p.effectiveVolume : 1;
+      const initialPan = p && typeof p.pan === 'number' ? p.pan : 0;
+
+      gainNode.gain.setValueAtTime(initialGain, ctx.currentTime);
+      if (pannerNode) {
+        pannerNode.pan.setValueAtTime(initialPan, ctx.currentTime);
+      }
+      audioEl.muted = true; // Web Audio graph is playing the sound
+    } catch (audioErr) {
+      console.warn('Fallback: direct audio element playback for', peerId, audioErr);
+      audioEl.muted = false;
+    }
+
+    const conn = peerConnections.get(peerId) || {};
+    conn.gainNode = gainNode;
+    conn.pannerNode = pannerNode;
+    conn.audioEl = audioEl;
+    peerConnections.set(peerId, conn);
+
+    logEvent(`🔊 Voice audio receiving from ${peerId}`, '#38bdf8');
+  }
+
+  // Create or retrieve RTCPeerConnection for a peer
+  function getOrCreatePeerConnection(peerId, isInitiator = false) {
+    let conn = peerConnections.get(peerId);
+    if (conn && conn.pc && conn.pc.signalingState !== 'closed') {
+      return conn.pc;
+    }
+
+    const pc = new RTCPeerConnection(RTC_CONFIG);
+
+    if (localMediaStream) {
+      localMediaStream.getAudioTracks().forEach((track) => {
+        pc.addTrack(track, localMediaStream);
+      });
+    }
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        socket.emit('webrtc:ice', {
+          to: peerId,
+          candidate: event.candidate,
+        });
+      }
+    };
+
+    pc.ontrack = (event) => {
+      if (event.streams && event.streams[0]) {
+        setupRemoteAudioGraph(peerId, event.streams[0]);
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'connected') {
+        logEvent(`P2P Voice Mesh connected with ${peerId}`, '#22c55e');
+      } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+        closePeerConnection(peerId);
+      }
+    };
+
+    peerConnections.set(peerId, { pc, gainNode: null, pannerNode: null, audioEl: null });
+
+    if (isInitiator) {
+      pc.createOffer({ offerToReceiveAudio: true })
+        .then((offer) => pc.setLocalDescription(offer))
+        .then(() => {
+          socket.emit('webrtc:offer', {
+            to: peerId,
+            sdp: pc.localDescription,
+          });
+        })
+        .catch((err) => console.error('Error creating offer:', err));
+    }
+
+    return pc;
+  }
+
+  function initiatePeerConnectionIfNeeded(peerId) {
+    if (!peerConnections.has(peerId)) {
+      // Deterministic initiator tie-breaker to prevent offer collision:
+      const shouldInitiate = myAvatar.userId > peerId;
+      if (shouldInitiate) {
+        getOrCreatePeerConnection(peerId, true);
+      }
+    }
+  }
+
+  function closePeerConnection(peerId) {
+    const conn = peerConnections.get(peerId);
+    if (conn) {
+      if (conn.gainNode && audioCtx) {
+        conn.gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.05);
+      }
+      setTimeout(() => {
+        if (conn.pc) conn.pc.close();
+        if (conn.audioEl && conn.audioEl.parentNode) {
+          conn.audioEl.parentNode.removeChild(conn.audioEl);
+        }
+        peerConnections.delete(peerId);
+      }, 300);
+    }
+  }
+
+  function updateSpatialGain(peerId, effectiveVolume, pan) {
+    const conn = peerConnections.get(peerId);
+    const ctx = getAudioContext();
+    if (!conn || !ctx) return;
+
+    if (conn.gainNode) {
+      const vol = typeof effectiveVolume === 'number' ? Math.max(0, Math.min(1, effectiveVolume)) : 1;
+      conn.gainNode.gain.setTargetAtTime(vol, ctx.currentTime, 0.04);
+    }
+    if (conn.pannerNode && typeof pan === 'number') {
+      const p = Math.max(-1, Math.min(1, pan));
+      conn.pannerNode.pan.setTargetAtTime(p, ctx.currentTime, 0.04);
+    }
+  }
+
+  // Mute button & voice activation toggle
   if (muteBtn) {
-    muteBtn.addEventListener('click', () => {
+    muteBtn.addEventListener('click', async () => {
+      // First click: activate microphone if not yet activated
+      if (!localMediaStream) {
+        await enableVoiceStreaming();
+        return;
+      }
+
+      // Subsequent clicks: toggle mute
       myAvatar.isMuted = !myAvatar.isMuted;
+      localMediaStream.getAudioTracks().forEach((track) => {
+        track.enabled = !myAvatar.isMuted;
+      });
+
       muteBtn.classList.toggle('active', myAvatar.isMuted);
-      muteBtn.textContent = myAvatar.isMuted ? '🔇 Mic Muted' : '🎙️ Mic Active';
+      muteBtn.textContent = myAvatar.isMuted ? '🔇 Mic Muted (Click to Unmute)' : '🎙️ Mic Active (Click to Mute)';
+      muteBtn.style.background = myAvatar.isMuted ? '#ef4444' : '#16a34a';
+
       socket.emit('audio:state', {
         isMuted: myAvatar.isMuted,
         isSpeaking: !myAvatar.isMuted,
@@ -309,20 +555,84 @@
     }
   });
 
+  // WebRTC P2P Signaling Listeners
+  socket.on('webrtc:offer', async (data) => {
+    const fromPeerId = data.from;
+    const pc = getOrCreatePeerConnection(fromPeerId, false);
+
+    try {
+      await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+
+      if (localMediaStream) {
+        const senders = pc.getSenders();
+        localMediaStream.getAudioTracks().forEach((track) => {
+          if (!senders.some((s) => s.track && s.track.id === track.id)) {
+            pc.addTrack(track, localMediaStream);
+          }
+        });
+      }
+
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      socket.emit('webrtc:answer', {
+        to: fromPeerId,
+        sdp: pc.localDescription,
+      });
+    } catch (err) {
+      console.error('Error handling webrtc:offer:', err);
+    }
+  });
+
+  socket.on('webrtc:answer', async (data) => {
+    const conn = peerConnections.get(data.from);
+    if (conn && conn.pc) {
+      try {
+        await conn.pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+      } catch (err) {
+        console.error('Error setting remote description for answer:', err);
+      }
+    }
+  });
+
+  socket.on('webrtc:ice', async (data) => {
+    const conn = peerConnections.get(data.from);
+    if (conn && conn.pc && data.candidate) {
+      try {
+        await conn.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+      } catch (err) {
+        console.error('Error adding ICE candidate:', err);
+      }
+    }
+  });
+
+  socket.on('webrtc:hangup', (data) => {
+    closePeerConnection(data.from);
+  });
+
   // Proximity Audio Events
   socket.on('proximity:enter', (t) => {
     audiblePeers.set(t.peerId, t);
     renderAudiblePeersUI();
+    if (isVoiceEnabled) {
+      initiatePeerConnectionIfNeeded(t.peerId);
+    }
+    updateSpatialGain(t.peerId, t.effectiveVolume, t.pan);
   });
 
   socket.on('proximity:update', (t) => {
     audiblePeers.set(t.peerId, t);
     renderAudiblePeersUI();
+    if (isVoiceEnabled) {
+      initiatePeerConnectionIfNeeded(t.peerId);
+    }
+    updateSpatialGain(t.peerId, t.effectiveVolume, t.pan);
   });
 
   socket.on('proximity:leave', ({ peerId }) => {
     audiblePeers.delete(peerId);
     renderAudiblePeersUI();
+    closePeerConnection(peerId);
   });
 
   // QoS Latency Ping
