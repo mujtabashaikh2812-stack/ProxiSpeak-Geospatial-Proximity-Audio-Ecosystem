@@ -10,12 +10,12 @@ test('requiring bridge never throws', () => {
 });
 
 test('getCachedNearby returns null with no cache', () => {
-  const b = createNearbyCacheBridge();
+  const b = createNearbyCacheBridge({ cache: null });
   assert.equal(b.getCachedNearby('u', 10, 10), null);
 });
 
 test('setCachedNearby returns false with no cache', () => {
-  const b = createNearbyCacheBridge();
+  const b = createNearbyCacheBridge({ cache: null });
   assert.equal(b.setCachedNearby('u', [], 10, 10), false);
 });
 

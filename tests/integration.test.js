@@ -3,7 +3,12 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+let MongoMemoryServer = null;
+try {
+  ({ MongoMemoryServer } = require('mongodb-memory-server'));
+} catch (_) {
+  MongoMemoryServer = null;
+}
 const { connectDB } = require('../db');
 const User = require('../User');
 const { findUsersNearCanvasPoint } = require('../proximityService');
@@ -18,8 +23,14 @@ let memoryServer = null;
 test.before(async () => {
   try {
     await connectDB();
+    await User.init();
     dbAvailable = true;
   } catch (err) {
+    if (!MongoMemoryServer) {
+      dbAvailable = false;
+      dbUnavailableReason = 'MongoDB not available and mongodb-memory-server not installed: ' + err.message;
+      return;
+    }
     console.log('MongoDB not available, falling back to mongodb-memory-server:', err.message);
     try {
       memoryServer = await MongoMemoryServer.create();

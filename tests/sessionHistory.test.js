@@ -3,7 +3,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+let MongoMemoryServer = null;
+try {
+  ({ MongoMemoryServer } = require('mongodb-memory-server'));
+} catch (_) {
+  MongoMemoryServer = null;
+}
 const { connectDB } = require('../db');
 const { UserSession } = require('../models/UserSession');
 const sessionHistory = require('../sessionHistory');
@@ -16,6 +21,10 @@ test.before(async () => {
     await connectDB();
     dbAvailable = true;
   } catch (err) {
+    if (!MongoMemoryServer) {
+      dbAvailable = false;
+      return;
+    }
     try {
       memoryServer = await MongoMemoryServer.create();
       const uri = await memoryServer.getUri();

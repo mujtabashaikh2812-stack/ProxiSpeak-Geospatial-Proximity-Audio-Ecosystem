@@ -20,8 +20,8 @@ function gridKey(userId, canvasX, canvasY) {
 }
 
 function createNearbyCacheBridge(options) {
-  const injected = (options && options.cache) ? options.cache : null;
-  const cache = injected || (cacheAvailable ? (cacheModule.defaultSpatialCache || cacheModule.SpatialCache && new cacheModule.SpatialCache()) : null);
+  const hasCacheOption = options && Object.prototype.hasOwnProperty.call(options, 'cache');
+  const cache = hasCacheOption ? options.cache : (cacheAvailable ? (cacheModule.defaultSpatialCache || (cacheModule.SpatialCache && new cacheModule.SpatialCache())) : null);
 
   function getCachedNearby(userId, canvasX, canvasY) {
     if (typeof userId !== 'string' || userId.trim() === '') return null;

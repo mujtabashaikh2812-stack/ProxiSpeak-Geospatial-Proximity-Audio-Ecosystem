@@ -27,6 +27,7 @@ async function seedZones(options = {}) {
 
   const alreadyConnected = mongoose.connection.readyState === 1;
   if (!alreadyConnected) await connectDB();
+  await OfficeZone.init();
 
   try {
     const zones = [
