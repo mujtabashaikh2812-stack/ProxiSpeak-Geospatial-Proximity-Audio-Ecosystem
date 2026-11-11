@@ -17,7 +17,7 @@ ENV NODE_ENV=production \
 COPY package*.json ./
 
 # Install only production dependencies cleanly
-RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+RUN (npm ci --omit=dev --ignore-scripts || npm install --omit=dev --no-audit --ignore-scripts) && npm cache clean --force
 
 # Copy application source code
 COPY . .
